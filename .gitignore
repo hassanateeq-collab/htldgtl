@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+.pnp*
+
+# builds
+dist/
+build/
+.vercel/
+.turbo/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# logs & os
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+
+# editor
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# claude local settings
+.claude/settings.local.json
