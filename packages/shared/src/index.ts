@@ -3,6 +3,7 @@
 
 export * from './format'
 export * from './i18n'
+export type { Database, Json } from './database.types'
 
 // --- Feature keys (mirrored by a DB check constraint on platform_features.key) ---
 export const CORE_FEATURES = [
@@ -62,6 +63,10 @@ export const PAYMENT_METHODS = [
   'cash',
 ] as const
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
+
+// --- Housekeeping (rooms.housekeeping_status) ---
+export const HOUSEKEEPING_STATUSES = ['clean', 'dirty', 'inspected', 'out_of_order'] as const
+export type HousekeepingStatus = (typeof HOUSEKEEPING_STATUSES)[number]
 
 // --- Bookings ---
 export const BOOKING_STATUSES = [

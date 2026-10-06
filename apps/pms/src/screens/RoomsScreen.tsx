@@ -1,11 +1,10 @@
-import { formatPKR, t } from '@hotel-digital/shared'
+import { formatPKR, t, type HousekeepingStatus } from '@hotel-digital/shared'
+import { ErrorNote, Loading } from '@/components/State'
+import { useTenant } from '@/data/tenant'
+import { useBookings, useRooms, useRoomTypes } from '@/data/queries'
+import { OCCUPYING_STATUSES } from '@/data/types'
+import { isNightCovered, todayStr } from '@/lib/dates'
 import { hkLabel } from '@/lib/labels'
-import {
-  sampleProperty,
-  sampleRoomTypes,
-  sampleRooms,
-  type HousekeepingStatus,
-} from '@/mock/sample-property'
 
 const hkDot: Record<HousekeepingStatus, string> = {
   clean: 'bg-green-500',
@@ -15,21 +14,52 @@ const hkDot: Record<HousekeepingStatus, string> = {
 }
 
 export function RoomsScreen() {
+  const { property } = useTenant()
+  const roomTypesQ = useRoomTypes(property.id)
+  const roomsQ = useRooms(property.id)
+  const bookingsQ = useBookings(property.id)
+
+  if (roomTypesQ.isPending || roomsQ.isPending || bookingsQ.isPending) return <Loading />
+  const error = roomTypesQ.error ?? roomsQ.error ?? bookingsQ.error
+  if (error) {
+    return (
+      <ErrorNote
+        message={error.message}
+        onRetry={() => {
+          void roomTypesQ.refetch()
+          void roomsQ.refetch()
+          void bookingsQ.refetch()
+        }}
+      />
+    )
+  }
+
+  const roomTypes = roomTypesQ.data ?? []
+  const rooms = roomsQ.data ?? []
+  const bookings = bookingsQ.data ?? []
+  const today = todayStr()
+  const occupiedTonight = new Set(
+    bookings
+      .filter((b) => OCCUPYING_STATUSES.has(b.status) && isNightCovered(b.checkIn, b.checkOut, today))
+      .map((b) => b.roomId),
+  ).size
+  const freeTonight = Math.max(rooms.length - occupiedTonight, 0)
+
   return (
     <div className="mx-auto max-w-md space-y-4 px-4 py-4 pb-24">
       <section className="grid grid-cols-3 gap-2">
-        <Stat label={t('rooms.roomTypes')} value={String(sampleRoomTypes.length)} />
-        <Stat label={t('rooms.rooms')} value={String(sampleRooms.length)} />
-        <Stat label={t('rooms.class')} value={t('rooms.star', { n: sampleProperty.starRating })} />
+        <Stat label={t('rooms.roomTypes')} value={String(roomTypes.length)} />
+        <Stat label={t('rooms.rooms')} value={String(rooms.length)} />
+        <Stat label={t('rooms.availableTonight')} value={String(freeTonight)} />
       </section>
 
       <p className="text-xs text-muted-foreground">
-        {t('rooms.checkInFrom', { time: sampleProperty.checkInFrom })} ·{' '}
-        {t('rooms.checkOutBy', { time: sampleProperty.checkOutUntil })} · {sampleProperty.currency}
+        {property.name}
+        {property.city ? ` · ${property.city}` : ''} · {property.currency}
       </p>
 
-      {sampleRoomTypes.map((rt) => {
-        const rooms = sampleRooms.filter((r) => r.roomTypeId === rt.id)
+      {roomTypes.map((rt) => {
+        const typeRooms = rooms.filter((r) => r.roomTypeId === rt.id)
         return (
           <section
             key={rt.id}
@@ -39,7 +69,9 @@ export function RoomsScreen() {
               <div>
                 <h2 className="font-semibold">{rt.name}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {rt.bedConfig} · {rt.sizeSqm} m² · {t('rooms.sleeps', { n: rt.maxOccupancy })}
+                  {[rt.bedConfig, rt.sizeSqm ? `${rt.sizeSqm} m²` : null, t('rooms.sleeps', { n: rt.maxOccupancy })]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </p>
               </div>
               <div className="shrink-0 text-right">
@@ -48,7 +80,7 @@ export function RoomsScreen() {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {rooms.map((room) => (
+              {typeRooms.map((room) => (
                 <span
                   key={room.id}
                   className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs"

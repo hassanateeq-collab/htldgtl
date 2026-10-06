@@ -1,16 +1,24 @@
 import { t } from '@hotel-digital/shared'
 import { BookingRow } from '@/components/BookingRow'
-import { TODAY, sampleBookings, type SampleBooking } from '@/mock/sample-bookings'
+import { ErrorNote, Loading } from '@/components/State'
+import { useTenant } from '@/data/tenant'
+import { useBookings } from '@/data/queries'
+import type { BookingVM } from '@/data/types'
+import { todayStr } from '@/lib/dates'
 
-const byCheckIn = (a: SampleBooking, b: SampleBooking) => a.checkIn.localeCompare(b.checkIn)
+const byCheckIn = (a: BookingVM, b: BookingVM) => a.checkIn.localeCompare(b.checkIn)
 
 export function BookingsScreen() {
-  const current = sampleBookings
-    .filter((bk) => bk.checkOut >= TODAY && bk.status !== 'cancelled')
-    .sort(byCheckIn)
-  const past = sampleBookings
-    .filter((bk) => bk.checkOut < TODAY || bk.status === 'cancelled')
-    .sort((a, b) => byCheckIn(b, a))
+  const { property } = useTenant()
+  const bookingsQ = useBookings(property.id)
+
+  if (bookingsQ.isPending) return <Loading />
+  if (bookingsQ.isError) return <ErrorNote message={bookingsQ.error.message} onRetry={() => void bookingsQ.refetch()} />
+
+  const today = todayStr()
+  const all = bookingsQ.data
+  const current = all.filter((b) => b.checkOut >= today && b.status !== 'cancelled').sort(byCheckIn)
+  const past = all.filter((b) => b.checkOut < today || b.status === 'cancelled').sort((a, b) => byCheckIn(b, a))
 
   return (
     <div className="mx-auto max-w-md space-y-5 px-4 py-4 pb-24">
@@ -20,7 +28,7 @@ export function BookingsScreen() {
   )
 }
 
-function Group({ title, bookings }: { title: string; bookings: SampleBooking[] }) {
+function Group({ title, bookings }: { title: string; bookings: BookingVM[] }) {
   return (
     <section className="space-y-2">
       <h2 className="text-sm font-semibold">
@@ -31,7 +39,7 @@ function Group({ title, bookings }: { title: string; bookings: SampleBooking[] }
           {t('bookings.empty')}
         </p>
       ) : (
-        bookings.map((bk) => <BookingRow key={bk.id} booking={bk} />)
+        bookings.map((b) => <BookingRow key={b.id} booking={b} />)
       )}
     </section>
   )

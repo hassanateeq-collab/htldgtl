@@ -11,6 +11,7 @@ The authoritative description of tables, helper functions, triggers and the RLS 
 | `20261006230200_rls_require_membership.sql` | tenant reads also require a live membership (defense in depth); tenant picker via membership |
 | `20261006230300_harden_functions.sql` | pinned `search_path`; function EXECUTE privileges |
 | `20261006230400_fix_fill_search_path.sql` | pinned `search_path` on the fill triggers |
+| `20261007000000_set_active_tenant.sql` | `set_active_tenant(slug)` — membership-checked stamping of `app_metadata.active_tenant` on the caller's own `auth.users` row (the client then refreshes its JWT); `my_memberships()` for the tenant picker |
 
 ## Conventions
 - **Tenant-owned tables** carry `tenant_id uuid not null`. **Operational tables** also carry `property_id`.

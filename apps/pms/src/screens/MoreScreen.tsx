@@ -1,5 +1,10 @@
+import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { BarChart3, Settings, Sparkles, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { t, type MessageKey } from '@hotel-digital/shared'
+import { Button } from '@/components/ui/button'
+import { useSession } from '@/auth/session'
+import { useTenant } from '@/data/tenant'
 
 const items: { key: MessageKey; icon: LucideIcon }[] = [
   { key: 'more.guests', icon: Users },
@@ -10,8 +15,19 @@ const items: { key: MessageKey; icon: LucideIcon }[] = [
 ]
 
 export function MoreScreen() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { session, signOut } = useSession()
+  const { role } = useTenant()
+
+  async function onSignOut() {
+    await signOut()
+    queryClient.clear()
+    navigate('/login', { replace: true })
+  }
+
   return (
-    <div className="mx-auto max-w-md px-4 py-4 pb-24">
+    <div className="mx-auto max-w-md space-y-4 px-4 py-4 pb-24">
       <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
         {items.map(({ key, icon: Icon }) => (
           <li key={key} className="flex items-center gap-3 px-4 py-3">
@@ -23,6 +39,21 @@ export function MoreScreen() {
           </li>
         ))}
       </ul>
+
+      <div className="rounded-lg border border-border bg-card p-4 text-card-foreground">
+        {session?.user.email && (
+          <p className="text-sm">{t('auth.signedInAs', { email: session.user.email })}</p>
+        )}
+        {role && <p className="mt-0.5 text-xs text-muted-foreground">{t(`role.${role}` as MessageKey)}</p>}
+        <div className="mt-3 flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/select-tenant')}>
+            {t('auth.switchHotel')}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => void onSignOut()}>
+            {t('auth.signOut')}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

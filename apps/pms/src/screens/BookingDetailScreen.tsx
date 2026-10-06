@@ -4,20 +4,33 @@ import { formatPKR, t } from '@hotel-digital/shared'
 import { Badge } from '@/components/ui/badge'
 import { Panel } from '@/components/Panel'
 import { StatusBadge } from '@/components/StatusBadge'
+import { ErrorNote, Loading } from '@/components/State'
+import { useTenant } from '@/data/tenant'
+import { useBookings, useFolio } from '@/data/queries'
 import { fmtShort, nightsBetween } from '@/lib/dates'
 import { methodLabel, nightsLabel, sourceLabel } from '@/lib/labels'
-import {
-  bookingById,
-  guestById,
-  paymentsForBooking,
-  roomById,
-  roomTypeById,
-} from '@/mock/sample-bookings'
 
 export function BookingDetailScreen() {
   const { id } = useParams()
-  const booking = bookingById(id ?? '')
+  const { property } = useTenant()
+  const bookingsQ = useBookings(property.id)
+  const folioQ = useFolio(id)
 
+  if (bookingsQ.isPending || folioQ.isPending) return <Loading />
+  const error = bookingsQ.error ?? folioQ.error
+  if (error) {
+    return (
+      <ErrorNote
+        message={error.message}
+        onRetry={() => {
+          void bookingsQ.refetch()
+          void folioQ.refetch()
+        }}
+      />
+    )
+  }
+
+  const booking = (bookingsQ.data ?? []).find((b) => b.id === id)
   if (!booking) {
     return (
       <div className="mx-auto max-w-md space-y-4 px-4 py-4">
@@ -27,14 +40,8 @@ export function BookingDetailScreen() {
     )
   }
 
-  const guest = guestById(booking.guestId)
-  const room = roomById(booking.roomId)
-  const roomType = roomTypeById(booking.roomTypeId)
+  const folio = folioQ.data ?? null
   const nights = nightsBetween(booking.checkIn, booking.checkOut)
-  const charges = nights * booking.nightlyRatePkr
-  const payments = paymentsForBooking(booking.id)
-  const paid = payments.reduce((sum, p) => sum + p.amountPkr, 0)
-  const balance = charges - paid
 
   return (
     <div className="mx-auto max-w-md space-y-4 px-4 py-4 pb-24">
@@ -43,7 +50,7 @@ export function BookingDetailScreen() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-muted-foreground">{booking.bookingNo}</p>
-          <h2 className="text-xl font-semibold">{guest?.name}</h2>
+          <h2 className="text-xl font-semibold">{booking.guest?.name ?? '—'}</h2>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <StatusBadge status={booking.status} />
@@ -52,17 +59,17 @@ export function BookingDetailScreen() {
       </div>
 
       <Panel title={t('booking.guest')}>
-        <Row label={t('booking.guest')} value={guest?.name ?? '—'} />
-        <Row label="Phone" value={guest?.phone ?? '—'} />
-        <Row label="Nationality" value={guest?.nationality ?? '—'} />
+        <Row label={t('booking.guest')} value={booking.guest?.name ?? '—'} />
+        <Row label="Phone" value={booking.guest?.phone ?? '—'} />
+        <Row label="Nationality" value={booking.guest?.nationality ?? '—'} />
       </Panel>
 
       <Panel title={t('booking.stay')}>
-        <Row label={t('booking.room')} value={`${room?.label ?? '—'} · ${roomType?.name ?? ''}`} />
         <Row
-          label={t('booking.dates')}
-          value={`${fmtShort(booking.checkIn)} → ${fmtShort(booking.checkOut)}`}
+          label={t('booking.room')}
+          value={`${booking.roomLabel ?? '—'} · ${booking.roomTypeName ?? ''}`}
         />
+        <Row label={t('booking.dates')} value={`${fmtShort(booking.checkIn)} → ${fmtShort(booking.checkOut)}`} />
         <Row label={t('booking.nights')} value={nightsLabel(nights)} />
         <Row label={t('booking.adults')} value={String(booking.adults)} />
         <Row label={t('booking.rate')} value={formatPKR(booking.nightlyRatePkr)} />
@@ -75,29 +82,32 @@ export function BookingDetailScreen() {
       )}
 
       <Panel title={t('booking.folio')}>
-        <Row
-          label={`${t('booking.roomCharges')} (${nights} × ${formatPKR(booking.nightlyRatePkr)})`}
-          value={formatPKR(charges)}
-        />
-        <div className="my-2 border-t border-border" />
-        {payments.length === 0 ? (
+        {!folio || folio.items.length === 0 ? (
           <p className="text-sm text-muted-foreground">—</p>
         ) : (
-          payments.map((p) => (
+          folio.items.map((item) => (
             <Row
-              key={p.id}
-              label={`${methodLabel(p.method)}${p.reference ? ` · ${p.reference}` : ''} · ${fmtShort(p.receivedOn)}`}
-              value={`− ${formatPKR(p.amountPkr)}`}
+              key={item.id}
+              label={
+                item.kind === 'payment'
+                  ? `${methodLabel(item.method ?? 'cash')}${item.reference ? ` · ${item.reference}` : ''} · ${fmtShort(item.postedAt.slice(0, 10))}`
+                  : item.description
+              }
+              value={item.kind === 'payment' ? `− ${formatPKR(item.amountPkr)}` : formatPKR(item.amountPkr)}
             />
           ))
         )}
         <div className="my-2 border-t border-border" />
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-semibold">
-            {balance > 0 ? t('booking.balance') : t('booking.settled')}
+            {(folio?.balance ?? 0) > 0 ? t('booking.balance') : t('booking.settled')}
           </span>
-          <span className={balance > 0 ? 'text-lg font-semibold' : 'text-lg font-semibold text-green-700'}>
-            {formatPKR(Math.max(balance, 0))}
+          <span
+            className={
+              (folio?.balance ?? 0) > 0 ? 'text-lg font-semibold' : 'text-lg font-semibold text-green-700'
+            }
+          >
+            {formatPKR(Math.max(folio?.balance ?? 0, 0))}
           </span>
         </div>
       </Panel>

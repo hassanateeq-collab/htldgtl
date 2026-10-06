@@ -2,39 +2,59 @@ import { formatPKR, t, type PaymentMethod } from '@hotel-digital/shared'
 import { Badge } from '@/components/ui/badge'
 import { BookingRow } from '@/components/BookingRow'
 import { Panel } from '@/components/Panel'
-import { fmtLong } from '@/lib/dates'
+import { ErrorNote, Loading } from '@/components/State'
+import { useTenant } from '@/data/tenant'
+import { useBookings, useRooms, useTodayPayments } from '@/data/queries'
+import { ACTIVE_STATUSES, OCCUPYING_STATUSES, type BookingVM } from '@/data/types'
+import { fmtLong, isNightCovered, todayStr } from '@/lib/dates'
 import { methodLabel } from '@/lib/labels'
-import { sampleRooms } from '@/mock/sample-property'
-import {
-  TODAY,
-  isActiveBooking,
-  occupiedOnNight,
-  sampleBookings,
-  samplePayments,
-  type SampleBooking,
-} from '@/mock/sample-bookings'
 
 export function TodayScreen() {
-  const arrivals = sampleBookings.filter((bk) => bk.checkIn === TODAY && isActiveBooking(bk))
-  const departures = sampleBookings.filter(
-    (bk) => bk.checkOut === TODAY && (bk.status === 'checked_in' || bk.status === 'checked_out'),
-  )
-  const inHouse = sampleBookings.filter((bk) => bk.status === 'checked_in')
+  const { property } = useTenant()
+  const today = todayStr()
+  const bookingsQ = useBookings(property.id)
+  const roomsQ = useRooms(property.id)
+  const paymentsQ = useTodayPayments(property.id)
 
-  const occupied = occupiedOnNight(TODAY).length
-  const totalRooms = sampleRooms.length
+  if (bookingsQ.isPending || roomsQ.isPending || paymentsQ.isPending) return <Loading />
+  const error = bookingsQ.error ?? roomsQ.error ?? paymentsQ.error
+  if (error) {
+    return (
+      <ErrorNote
+        message={error.message}
+        onRetry={() => {
+          void bookingsQ.refetch()
+          void roomsQ.refetch()
+          void paymentsQ.refetch()
+        }}
+      />
+    )
+  }
+
+  const bookings = bookingsQ.data ?? []
+  const rooms = roomsQ.data ?? []
+  const payments = paymentsQ.data ?? []
+
+  const arrivals = bookings.filter((b) => b.checkIn === today && ACTIVE_STATUSES.has(b.status))
+  const departures = bookings.filter(
+    (b) => b.checkOut === today && (b.status === 'checked_in' || b.status === 'checked_out'),
+  )
+  const inHouse = bookings.filter((b) => b.status === 'checked_in')
+  const occupied = bookings.filter(
+    (b) => OCCUPYING_STATUSES.has(b.status) && isNightCovered(b.checkIn, b.checkOut, today),
+  ).length
+  const totalRooms = rooms.length
   const occupancyPct = totalRooms ? Math.round((occupied / totalRooms) * 100) : 0
 
-  const todayPayments = samplePayments.filter((p) => p.receivedOn === TODAY)
-  const cashTotal = todayPayments.reduce((sum, p) => sum + p.amountPkr, 0)
-  const byMethod = todayPayments.reduce<Partial<Record<PaymentMethod, number>>>((acc, p) => {
+  const cashTotal = payments.reduce((sum, p) => sum + p.amountPkr, 0)
+  const byMethod = payments.reduce<Partial<Record<PaymentMethod, number>>>((acc, p) => {
     acc[p.method] = (acc[p.method] ?? 0) + p.amountPkr
     return acc
   }, {})
 
   return (
     <div className="mx-auto max-w-md space-y-5 px-4 py-4 pb-24">
-      <p className="text-sm text-muted-foreground">{fmtLong(TODAY)}</p>
+      <p className="text-sm text-muted-foreground">{fmtLong(today)}</p>
 
       <div className="grid grid-cols-2 gap-2">
         <Kpi label={t('today.arrivals')} value={arrivals.length} />
@@ -75,7 +95,7 @@ function Kpi({ label, value, sub }: { label: string; value: string | number; sub
   )
 }
 
-function Section({ title, bookings }: { title: string; bookings: SampleBooking[] }) {
+function Section({ title, bookings }: { title: string; bookings: BookingVM[] }) {
   return (
     <section className="space-y-2">
       <h2 className="text-sm font-semibold">
@@ -86,7 +106,7 @@ function Section({ title, bookings }: { title: string; bookings: SampleBooking[]
           {t('today.none')}
         </p>
       ) : (
-        bookings.map((bk) => <BookingRow key={bk.id} booking={bk} />)
+        bookings.map((b) => <BookingRow key={b.id} booking={b} />)
       )}
     </section>
   )

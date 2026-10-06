@@ -1,16 +1,12 @@
 import { Link } from 'react-router-dom'
 import type { BookingStatus } from '@hotel-digital/shared'
-import { cn } from '@/lib/utils'
-import { addDaysStr, daysBetween, fmtDay, fmtDayNum, type DateStr } from '@/lib/dates'
+import { ErrorNote, Loading } from '@/components/State'
+import { useTenant } from '@/data/tenant'
+import { useBookings, useRooms, useRoomTypes } from '@/data/queries'
+import { OCCUPYING_STATUSES, type BookingVM } from '@/data/types'
+import { addDaysStr, daysBetween, fmtDay, fmtDayNum, isNightCovered, todayStr, type DateStr } from '@/lib/dates'
 import { statusLabel } from '@/lib/labels'
-import { sampleRoomTypes, sampleRooms } from '@/mock/sample-property'
-import {
-  TODAY,
-  bookingsForRoom,
-  guestById,
-  occupiedOnNight,
-  type SampleBooking,
-} from '@/mock/sample-bookings'
+import { cn } from '@/lib/utils'
 
 // Tape chart geometry. Bars start and end mid-cell so a same-day
 // check-out / check-in in one room never visually overlaps.
@@ -18,10 +14,7 @@ const COL_W = 56
 const LABEL_W = 60
 const ROW_H = 44
 const DAYS = 14
-const START: DateStr = addDaysStr(TODAY, -2)
-const DATES: DateStr[] = Array.from({ length: DAYS }, (_, i) => addDaysStr(START, i))
 const GRID_W = DAYS * COL_W
-const TODAY_IDX = daysBetween(START, TODAY)
 
 type DrawnStatus = Exclude<BookingStatus, 'cancelled'>
 const barStyles: Record<DrawnStatus, string> = {
@@ -32,7 +25,37 @@ const barStyles: Record<DrawnStatus, string> = {
 }
 
 export function CalendarScreen() {
-  const totalRooms = sampleRooms.length
+  const { property } = useTenant()
+  const roomTypesQ = useRoomTypes(property.id)
+  const roomsQ = useRooms(property.id)
+  const bookingsQ = useBookings(property.id)
+
+  if (roomTypesQ.isPending || roomsQ.isPending || bookingsQ.isPending) return <Loading />
+  const error = roomTypesQ.error ?? roomsQ.error ?? bookingsQ.error
+  if (error) {
+    return (
+      <ErrorNote
+        message={error.message}
+        onRetry={() => {
+          void roomTypesQ.refetch()
+          void roomsQ.refetch()
+          void bookingsQ.refetch()
+        }}
+      />
+    )
+  }
+
+  const roomTypes = roomTypesQ.data ?? []
+  const rooms = roomsQ.data ?? []
+  const bookings = bookingsQ.data ?? []
+  const today = todayStr()
+  const start: DateStr = addDaysStr(today, -2)
+  const dates: DateStr[] = Array.from({ length: DAYS }, (_, i) => addDaysStr(start, i))
+  const todayIdx = daysBetween(start, today)
+  const totalRooms = rooms.length
+
+  const occupiedOn = (night: DateStr) =>
+    bookings.filter((b) => OCCUPYING_STATUSES.has(b.status) && isNightCovered(b.checkIn, b.checkOut, night)).length
 
   return (
     <div className="flex h-[calc(100svh-7rem)] flex-col">
@@ -44,26 +67,26 @@ export function CalendarScreen() {
               className="sticky left-0 z-30 shrink-0 border-b border-r border-border bg-background"
               style={{ width: LABEL_W }}
             />
-            {DATES.map((ds) => (
+            {dates.map((ds) => (
               <div
                 key={ds}
                 className={cn(
                   'shrink-0 border-b border-l border-border py-1 text-center',
-                  ds === TODAY && 'bg-accent',
+                  ds === today && 'bg-accent',
                 )}
                 style={{ width: COL_W }}
               >
                 <div className="text-[10px] uppercase text-muted-foreground">{fmtDay(ds)}</div>
                 <div className="text-sm font-semibold leading-tight">{fmtDayNum(ds)}</div>
                 <div className="text-[10px] text-muted-foreground">
-                  {occupiedOnNight(ds).length}/{totalRooms}
+                  {occupiedOn(ds)}/{totalRooms}
                 </div>
               </div>
             ))}
           </div>
 
           {/* Rooms grouped by type */}
-          {sampleRoomTypes.map((rt) => (
+          {roomTypes.map((rt) => (
             <div key={rt.id}>
               <div className="flex">
                 <div
@@ -75,7 +98,7 @@ export function CalendarScreen() {
                 <div className="bg-muted/60" style={{ width: GRID_W, height: 24 }} />
               </div>
 
-              {sampleRooms
+              {rooms
                 .filter((room) => room.roomTypeId === rt.id)
                 .map((room) => (
                   <div key={room.id} className="flex" style={{ height: ROW_H }}>
@@ -94,11 +117,13 @@ export function CalendarScreen() {
                     >
                       <div
                         className="absolute inset-y-0 bg-accent/50"
-                        style={{ left: TODAY_IDX * COL_W, width: COL_W }}
+                        style={{ left: todayIdx * COL_W, width: COL_W }}
                       />
-                      {bookingsForRoom(room.id).map((bk) => (
-                        <Bar key={bk.id} booking={bk} />
-                      ))}
+                      {bookings
+                        .filter((b) => b.roomId === room.id && b.status !== 'cancelled')
+                        .map((b) => (
+                          <Bar key={b.id} booking={b} start={start} />
+                        ))}
                     </div>
                   </div>
                 ))}
@@ -111,29 +136,29 @@ export function CalendarScreen() {
   )
 }
 
-function Bar({ booking }: { booking: SampleBooking }) {
+function Bar({ booking, start }: { booking: BookingVM; start: DateStr }) {
   const status = booking.status
   if (status === 'cancelled') return null
 
-  const x0 = daysBetween(START, booking.checkIn) * COL_W + COL_W / 2
-  const x1 = daysBetween(START, booking.checkOut) * COL_W + COL_W / 2
+  const x0 = daysBetween(start, booking.checkIn) * COL_W + COL_W / 2
+  const x1 = daysBetween(start, booking.checkOut) * COL_W + COL_W / 2
   const left = Math.max(0, x0)
   const right = Math.min(GRID_W, x1)
   const width = right - left - 4
   if (width <= 8) return null
 
-  const guest = guestById(booking.guestId)
+  const name = booking.guest?.name ?? booking.bookingNo
   return (
     <Link
       to={`/bookings/${booking.id}`}
-      title={`${guest?.name ?? ''} · ${statusLabel(status)}`}
+      title={`${name} · ${statusLabel(status)}`}
       className={cn(
         'absolute inset-y-1.5 flex items-center truncate rounded-md px-2 text-xs font-medium shadow-sm',
         barStyles[status],
       )}
       style={{ left: left + 2, width }}
     >
-      {guest?.name.split(' ')[0]}
+      {name.split(' ')[0]}
     </Link>
   )
 }
