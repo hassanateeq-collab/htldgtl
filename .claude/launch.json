@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pms",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:pms"],
+      "port": 5173
+    }
+  ]
+}
