@@ -1,5 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
-import { BedDouble, CalendarDays, ClipboardList, Menu, Sun, type LucideIcon } from 'lucide-react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { BedDouble, CalendarDays, ClipboardList, Menu, Plus, Sun, type LucideIcon } from 'lucide-react'
 import { t, type MessageKey } from '@hotel-digital/shared'
 import { cn } from '@/lib/utils'
 import { useTenant } from '@/data/tenant'
@@ -12,9 +12,15 @@ const tabs: { to: string; label: MessageKey; icon: LucideIcon }[] = [
   { to: '/more', label: 'nav.more', icon: Menu },
 ]
 
+const WRITER_ROLES = ['owner', 'manager', 'front_desk']
+const FAB_ROUTES = ['/today', '/bookings', '/calendar']
+
 export function AppShell() {
-  const { tenant, property, access } = useTenant()
+  const { tenant, property, access, role } = useTenant()
+  const location = useLocation()
   const suspended = access?.accessLevel === 'none'
+  const canWrite = access?.accessLevel === 'full' && !!role && WRITER_ROLES.includes(role)
+  const showFab = canWrite && FAB_ROUTES.includes(location.pathname)
 
   return (
     <div className="min-h-svh bg-background text-foreground">
@@ -39,6 +45,17 @@ export function AppShell() {
           <Outlet />
         )}
       </main>
+
+      {showFab && (
+        <Link
+          to="/bookings/new"
+          aria-label={t('actions.newBooking')}
+          className="fixed right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95"
+          style={{ bottom: 'calc(4.25rem + env(safe-area-inset-bottom))' }}
+        >
+          <Plus className="h-6 w-6" aria-hidden />
+        </Link>
+      )}
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
         <ul className="grid grid-cols-5">

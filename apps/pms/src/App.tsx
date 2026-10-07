@@ -7,6 +7,7 @@ import { CalendarScreen } from '@/screens/CalendarScreen'
 import { LoginEntryScreen } from '@/screens/LoginEntryScreen'
 import { LoginScreen } from '@/screens/LoginScreen'
 import { MoreScreen } from '@/screens/MoreScreen'
+import { NewBookingScreen } from '@/screens/NewBookingScreen'
 import { RoomsScreen } from '@/screens/RoomsScreen'
 import { SelectTenantScreen } from '@/screens/SelectTenantScreen'
 import { TodayScreen } from '@/screens/TodayScreen'
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="today" element={<TodayScreen />} />
             <Route path="calendar" element={<CalendarScreen />} />
             <Route path="bookings" element={<BookingsScreen />} />
+            <Route path="bookings/new" element={<NewBookingScreen />} />
             <Route path="bookings/:id" element={<BookingDetailScreen />} />
             <Route path="rooms" element={<RoomsScreen />} />
             <Route path="more" element={<MoreScreen />} />

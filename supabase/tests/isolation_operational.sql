@@ -2,7 +2,10 @@
 -- Hotel Digital — operational suite
 -- No-double-book semantics, folio triggers under RLS, role matrix, add-on gate,
 -- cross-tenant writes. Run as postgres; every write is rolled back.
--- Assumes the demo seed (Central Residence with bookings CR-1001..CR-1014).
+-- Assumes the demo seed (Central Residence; CR-1001 occupied room 301 through
+-- today, CR-1004 confirmed with a balance due, CR-1006 checked out, CR-1012
+-- cancelled in room 303). Expected counts are computed as postgres so the suite
+-- stays valid as demo data grows.
 -- Expected: every row pass = true.
 -- =============================================================================
 create or replace function pg_temp.operational_suite()
@@ -11,6 +14,7 @@ language plpgsql as $$
 declare
   u_demo uuid; t_a uuid; t_b uuid; p_a uuid; p_b uuid;
   r301 uuid; rt301 uuid; r303 uuid; rt303 uuid; g1 uuid; folio1004 uuid; folio1006 uuid;
+  exp_bookings int; exp_rooms int; bal_before numeric;
   bal numeric; n int; n2 int; ok boolean; err text; v_bk uuid;
 begin
   -- lookups as postgres
@@ -26,6 +30,9 @@ begin
     where b.booking_no = 'CR-1004' and b.property_id = p_a;
   select f.id into folio1006 from public.folios f join public.bookings b on b.id = f.booking_id
     where b.booking_no = 'CR-1006' and b.property_id = p_a;
+  select count(*) into exp_bookings from public.bookings where property_id = p_a;
+  select count(*) into exp_rooms from public.rooms where property_id = p_a;
+  select balance into bal_before from public.folios where id = folio1004;
 
   -- become the owner of A
   perform set_config('request.jwt.claims', json_build_object('sub', u_demo, 'role', 'authenticated',
@@ -34,10 +41,10 @@ begin
 
   select count(*) into n from public.bookings;
   select count(*) into n2 from public.rooms;
-  test := 'A: owner sees all 14 bookings and 17 rooms'; pass := (n = 14 and n2 = 17);
-  detail := format('bookings=%s rooms=%s', n, n2); return next;
+  test := 'A: owner sees every booking and room of the property'; pass := (n = exp_bookings and n2 = exp_rooms);
+  detail := format('bookings=%s/%s rooms=%s/%s', n, exp_bookings, n2, exp_rooms); return next;
 
-  -- no-double-book: 301 is occupied T-2..T+1 by CR-1001 -> overlapping stay rejected
+  -- no-double-book: 301 is occupied through today by CR-1001 -> a stay covering last night is rejected
   ok := false; err := null;
   begin
     insert into public.bookings (tenant_id, property_id, guest_id, booking_no, status, source, check_in, check_out, adults)
@@ -49,7 +56,7 @@ begin
   test := 'no-double-book: overlapping stay rejected'; pass := (not ok and coalesce(err, '') like '%booking_rooms_no_overlap%');
   detail := coalesce(err, 'insert succeeded'); return next;
 
-  -- same-day turnover: 301 checks out T+1, so a stay T+1..T+3 must be allowed
+  -- same-day turnover: a stay starting on the check-out day must be allowed
   ok := false; err := null;
   begin
     insert into public.bookings (tenant_id, property_id, guest_id, booking_no, status, source, check_in, check_out, adults)
@@ -60,7 +67,7 @@ begin
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; end if; end;
   test := 'no-double-book: same-day turnover allowed'; pass := ok; detail := coalesce(err, 'ok'); return next;
 
-  -- cancelled stays do not block: 303 holds cancelled CR-1012 for T+1..T+2
+  -- cancelled stays do not block: 303 holds cancelled CR-1012
   ok := false; err := null;
   begin
     insert into public.bookings (tenant_id, property_id, guest_id, booking_no, status, source, check_in, check_out, adults)
@@ -79,8 +86,8 @@ begin
     select balance into bal from public.folios where id = folio1004;
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; end if; end;
-  test := 'folio: payment recomputes stored balance (37000 -> 32000)'; pass := (ok and bal = 32000);
-  detail := coalesce(err, format('balance=%s', bal)); return next;
+  test := 'folio: payment recomputes stored balance (-5000)'; pass := (ok and bal = bal_before - 5000);
+  detail := coalesce(err, format('before=%s after=%s', bal_before, bal)); return next;
 
   -- folio: closed folio rejects new items
   ok := false; err := null;

@@ -38,3 +38,6 @@ export const fmtDay = (s: DateStr) => format(fromDateStr(s), 'EEE') // Tue
 export const fmtDayNum = (s: DateStr) => format(fromDateStr(s), 'd') // 6
 export const fmtShort = (s: DateStr) => format(fromDateStr(s), 'dd MMM') // 06 Oct
 export const fmtLong = (s: DateStr) => format(fromDateStr(s), 'EEEE, dd MMM yyyy') // Tuesday, 06 Oct 2026
+
+/** Display an instant (ISO timestamptz) as a local-time "dd MMM" — never slice the UTC string. */
+export const fmtInstantShort = (iso: string) => format(new Date(iso), 'dd MMM')
