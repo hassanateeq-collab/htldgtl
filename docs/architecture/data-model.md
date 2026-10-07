@@ -13,6 +13,7 @@ The authoritative description of tables, helper functions, triggers and the RLS 
 | `20261006230400_fix_fill_search_path.sql` | pinned `search_path` on the fill triggers |
 | `20261007000000_set_active_tenant.sql` | `set_active_tenant(slug)` — membership-checked stamping of `app_metadata.active_tenant` on the caller's own `auth.users` row (the client then refreshes its JWT); `my_memberships()` for the tenant picker |
 | `20261007003000_booking_actions.sql` | **SECURITY INVOKER** front-desk actions (RLS applies as the caller): `create_booking()` — optional new guest, number from `next_booking_no()` (`tenant_settings.booking_prefix` + series), room assignment under the EXCLUDE constraint, room charge auto-posted; `set_booking_status()` — allowed transitions only, check-out blocked while balance due, then folio closed + room dirty. Suite: `supabase/tests/booking_actions.sql` |
+| `20261007010000_early_checkout_release.sql` | **Early departure releases the room:** on check-out before the planned date, `check_out` on the booking and its room assignment becomes today, so the EXCLUDE constraint frees the remaining nights. Same-day departures become zero-night rows (empty range never collides); the date checks relax to `check_out >= check_in` (`create_booking()` still requires ≥ 1 night). The app's free-room filter mirrors the EXCLUDE predicate (anything not cancelled / no-show blocks) |
 
 ## Conventions
 - **Tenant-owned tables** carry `tenant_id uuid not null`. **Operational tables** also carry `property_id`.

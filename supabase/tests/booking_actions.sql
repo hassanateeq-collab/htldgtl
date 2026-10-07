@@ -2,20 +2,22 @@
 -- Hotel Digital — booking actions suite
 -- create_booking() and set_booking_status() as the demo owner: numbering,
 -- auto-posted charge, no-double-book rejection, transition rules, the
--- balance-due check-out guard, folio close + room dirty on check-out, and
--- cross-tenant denial. Every write is rolled back. Assumes the demo seed
--- (Central Residence, booking_prefix CR; CR-1004 confirmed with a balance due,
--- CR-1006 checked out, room 203 free a week out, room 301 occupied yesterday).
--- Expected: every row pass = true.
+-- balance-due check-out guard, folio close + room dirty on check-out, early
+-- departure releasing the room, and cross-tenant denial. Every write is rolled
+-- back. Assumes the demo seed (Central Residence, booking_prefix CR; CR-1004
+-- confirmed with a balance due, CR-1006 checked out, CR-1009 checked in on a
+-- multi-night stay in room 305, room 203 free a week out, room 301 occupied
+-- yesterday). Expected: every row pass = true.
 -- =============================================================================
 create or replace function pg_temp.booking_actions_suite()
 returns table (test text, pass boolean, detail text)
 language plpgsql as $$
 declare
   u_demo uuid; t_a uuid; t_b uuid; p_a uuid;
-  r203 uuid; r301 uuid; bk1001 uuid; bk1004 uuid; bk1006 uuid; folio1004 uuid;
+  r203 uuid; r301 uuid; r305 uuid;
+  bk1001 uuid; bk1004 uuid; bk1006 uuid; bk1009 uuid; folio1004 uuid; folio1009 uuid;
   v_id uuid; v_no text; v_expected text; v_charges numeric;
-  v_status text; v_folio_status text; v_hk text;
+  v_status text; v_folio_status text; v_hk text; v_out date; v_room_out date;
   ok boolean; err text;
 begin
   select id into u_demo from auth.users where email = 'owner@demo.test';
@@ -24,10 +26,13 @@ begin
   select id into p_a from public.properties where tenant_id = t_a order by created_at limit 1;
   select id into r203 from public.rooms where property_id = p_a and label = '203';
   select id into r301 from public.rooms where property_id = p_a and label = '301';
+  select id into r305 from public.rooms where property_id = p_a and label = '305';
   select id into bk1001 from public.bookings where property_id = p_a and booking_no = 'CR-1001';
   select id into bk1004 from public.bookings where property_id = p_a and booking_no = 'CR-1004';
   select id into bk1006 from public.bookings where property_id = p_a and booking_no = 'CR-1006';
+  select id into bk1009 from public.bookings where property_id = p_a and booking_no = 'CR-1009';
   select id into folio1004 from public.folios where booking_id = bk1004;
+  select id into folio1009 from public.folios where booking_id = bk1009;
 
   perform set_config('request.jwt.claims', json_build_object('sub', u_demo, 'role', 'authenticated',
             'app_metadata', json_build_object('active_tenant', t_a))::text, true);
@@ -90,7 +95,24 @@ begin
   pass := (not ok and coalesce(err, '') like '%cannot go from%');
   detail := coalesce(err, 'allowed'); return next;
 
-  -- 5) same user with claim B (front_desk of Seaview) cannot touch A's booking
+  -- 5) early departure: CR-1009 (in-house, planned beyond today) checks out today ->
+  --    stay truncated to today on booking + room, and room 305 is bookable tonight
+  ok := false; err := null; v_out := null; v_room_out := null;
+  begin
+    insert into public.folio_items (folio_id, kind, description, amount_pkr, method)
+    select folio1009, 'payment', 'Settle', f.balance, 'cash' from public.folios f where f.id = folio1009 and f.balance > 0;
+    perform public.set_booking_status(bk1009, 'checked_out');
+    select check_out into v_out from public.bookings where id = bk1009;
+    select check_out into v_room_out from public.booking_rooms where booking_id = bk1009;
+    v_id := public.create_booking(p_a, r305, current_date, current_date + 1, 1, 'walk_in', 17000,
+                                  null, 'Rebook Tonight', null, null);
+    ok := true; raise exception 'ROLLBACK_PROBE';
+  exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; end if; end;
+  test := 'early departure: stay truncated to today, room rebookable tonight';
+  pass := (ok and v_out = current_date and v_room_out = current_date);
+  detail := coalesce(err, format('check_out=%s room_check_out=%s', v_out, v_room_out)); return next;
+
+  -- 6) same user with claim B (front_desk of Seaview) cannot touch A's booking
   perform set_config('request.jwt.claims', json_build_object('sub', u_demo, 'role', 'authenticated',
             'app_metadata', json_build_object('active_tenant', t_b))::text, true);
   ok := false; err := null;

@@ -9,7 +9,7 @@ import { ErrorNote, Loading } from '@/components/State'
 import { useTenant } from '@/data/tenant'
 import { useBookings, useRooms, useRoomTypes } from '@/data/queries'
 import { actionErrorLabel, useCreateBooking } from '@/data/mutations'
-import { ACTIVE_STATUSES } from '@/data/types'
+import { OCCUPYING_STATUSES } from '@/data/types'
 import { addDaysStr, nightsBetween, todayStr } from '@/lib/dates'
 import { sourceLabel } from '@/lib/labels'
 import { supabase } from '@/lib/supabase'
@@ -68,12 +68,13 @@ export function NewBookingScreen() {
   const selectedType = roomTypes.find((rt) => rt.id === effectiveTypeId)
   const nights = nightsBetween(checkIn, checkOut)
 
-  // Rooms of the chosen type with no live stay overlapping the requested nights.
-  // The database EXCLUDE constraint remains the race-safe guard.
+  // Rooms of the chosen type with no blocking stay overlapping the requested
+  // nights — the same rule as the database's EXCLUDE constraint, which remains
+  // the race-safe guard.
   const freeRooms = useMemo(() => {
     const busy = new Set(
       bookings
-        .filter((b) => ACTIVE_STATUSES.has(b.status) && b.roomId && b.checkIn < checkOut && checkIn < b.checkOut)
+        .filter((b) => OCCUPYING_STATUSES.has(b.status) && b.roomId && b.checkIn < checkOut && checkIn < b.checkOut)
         .map((b) => b.roomId),
     )
     return rooms.filter((r) => r.roomTypeId === effectiveTypeId && r.isActive && !busy.has(r.id))

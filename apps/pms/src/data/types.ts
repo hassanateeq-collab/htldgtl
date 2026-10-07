@@ -100,9 +100,14 @@ export interface PaymentVM {
   method: PaymentMethod
 }
 
-/** Bookings that still hold a room. */
+/** Live bookings: arriving or in-house. */
 export const ACTIVE_STATUSES: ReadonlySet<BookingStatus> = new Set(['confirmed', 'checked_in'])
-/** Statuses that occupy a room on their nights (completed stays count for past nights). */
+/**
+ * Statuses that block a room on the nights of their stay — mirrors the database's
+ * no-double-book EXCLUDE predicate (everything except cancelled / no-show).
+ * Early departures have their stay truncated to the actual check-out, so a
+ * checked-out booking never blocks future nights.
+ */
 export const OCCUPYING_STATUSES: ReadonlySet<BookingStatus> = new Set([
   'confirmed',
   'checked_in',
