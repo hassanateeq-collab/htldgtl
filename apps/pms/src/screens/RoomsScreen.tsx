@@ -46,8 +46,8 @@ export function RoomsScreen() {
   const freeTonight = Math.max(rooms.length - occupiedTonight, 0)
 
   return (
-    <div className="mx-auto max-w-md space-y-4 px-4 py-4 pb-24">
-      <section className="grid grid-cols-3 gap-2">
+    <div className="mx-auto w-full max-w-md space-y-4 px-4 py-4 pb-24 md:max-w-5xl md:px-6 md:py-6 md:pb-8">
+      <section className="grid grid-cols-3 gap-2 md:max-w-lg md:gap-3">
         <Stat label={t('rooms.roomTypes')} value={String(roomTypes.length)} />
         <Stat label={t('rooms.rooms')} value={String(rooms.length)} />
         <Stat label={t('rooms.availableTonight')} value={String(freeTonight)} />
@@ -58,42 +58,44 @@ export function RoomsScreen() {
         {property.city ? ` · ${property.city}` : ''} · {property.currency}
       </p>
 
-      {roomTypes.map((rt) => {
-        const typeRooms = rooms.filter((r) => r.roomTypeId === rt.id)
-        return (
-          <section
-            key={rt.id}
-            className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">{rt.name}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {[rt.bedConfig, rt.sizeSqm ? `${rt.sizeSqm} m²` : null, t('rooms.sleeps', { n: rt.maxOccupancy })]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
+      <div className="space-y-4 md:grid md:grid-cols-2 md:items-start md:gap-4 md:space-y-0 lg:grid-cols-3">
+        {roomTypes.map((rt) => {
+          const typeRooms = rooms.filter((r) => r.roomTypeId === rt.id)
+          return (
+            <section
+              key={rt.id}
+              className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold">{rt.name}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {[rt.bedConfig, rt.sizeSqm ? `${rt.sizeSqm} m²` : null, t('rooms.sleeps', { n: rt.maxOccupancy })]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-semibold">{formatPKR(rt.baseRatePkr)}</p>
+                  <p className="text-xs text-muted-foreground">{t('rooms.perNight')}</p>
+                </div>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="font-semibold">{formatPKR(rt.baseRatePkr)}</p>
-                <p className="text-xs text-muted-foreground">{t('rooms.perNight')}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {typeRooms.map((room) => (
+                  <span
+                    key={room.id}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs"
+                    title={hkLabel(room.housekeepingStatus)}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${hkDot[room.housekeepingStatus]}`} />
+                    {room.label}
+                  </span>
+                ))}
               </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {typeRooms.map((room) => (
-                <span
-                  key={room.id}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs"
-                  title={hkLabel(room.housekeepingStatus)}
-                >
-                  <span className={`h-2 w-2 rounded-full ${hkDot[room.housekeepingStatus]}`} />
-                  {room.label}
-                </span>
-              ))}
-            </div>
-          </section>
-        )
-      })}
+            </section>
+          )
+        })}
+      </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1.5 pt-1 text-xs text-muted-foreground">
         {(Object.keys(hkDot) as HousekeepingStatus[]).map((s) => (

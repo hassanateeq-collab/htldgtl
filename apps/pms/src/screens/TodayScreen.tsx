@@ -53,10 +53,10 @@ export function TodayScreen() {
   }, {})
 
   return (
-    <div className="mx-auto max-w-md space-y-5 px-4 py-4 pb-24">
-      <p className="text-sm text-muted-foreground">{fmtLong(today)}</p>
+    <div className="mx-auto w-full max-w-md space-y-5 px-4 py-4 pb-24 md:max-w-5xl md:px-6 md:py-6 md:pb-8">
+      <p className="text-sm text-muted-foreground md:text-base">{fmtLong(today)}</p>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
         <Kpi label={t('today.arrivals')} value={arrivals.length} />
         <Kpi label={t('today.departures')} value={departures.length} />
         <Kpi label={t('today.inHouse')} value={inHouse.length} />
@@ -78,18 +78,20 @@ export function TodayScreen() {
         </div>
       </Panel>
 
-      <Section title={t('today.arrivalsToday')} bookings={arrivals} />
-      <Section title={t('today.departuresToday')} bookings={departures} />
-      <Section title={t('today.inHouseNow')} bookings={inHouse} />
+      <div className="space-y-5 md:grid md:grid-cols-3 md:items-start md:gap-4 md:space-y-0">
+        <Section title={t('today.arrivalsToday')} bookings={arrivals} />
+        <Section title={t('today.departuresToday')} bookings={departures} />
+        <Section title={t('today.inHouseNow')} bookings={inHouse} />
+      </div>
     </div>
   )
 }
 
 function Kpi({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3 text-card-foreground">
+    <div className="rounded-lg border border-border bg-card p-3 text-card-foreground md:p-4">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold leading-tight">{value}</p>
+      <p className="text-2xl font-semibold leading-tight md:text-3xl">{value}</p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
     </div>
   )

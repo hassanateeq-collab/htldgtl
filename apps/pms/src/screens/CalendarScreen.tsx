@@ -6,6 +6,7 @@ import { useBookings, useRooms, useRoomTypes } from '@/data/queries'
 import { OCCUPYING_STATUSES, type BookingVM } from '@/data/types'
 import { addDaysStr, daysBetween, fmtDay, fmtDayNum, isNightCovered, todayStr, type DateStr } from '@/lib/dates'
 import { statusLabel } from '@/lib/labels'
+import { useIsDesktop } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 
 // Tape chart geometry. Bars start and end mid-cell so a same-day
@@ -13,8 +14,6 @@ import { cn } from '@/lib/utils'
 const COL_W = 56
 const LABEL_W = 60
 const ROW_H = 44
-const DAYS = 14
-const GRID_W = DAYS * COL_W
 
 type DrawnStatus = Exclude<BookingStatus, 'cancelled'>
 const barStyles: Record<DrawnStatus, string> = {
@@ -29,6 +28,7 @@ export function CalendarScreen() {
   const roomTypesQ = useRoomTypes(property.id)
   const roomsQ = useRooms(property.id)
   const bookingsQ = useBookings(property.id)
+  const desktop = useIsDesktop()
 
   if (roomTypesQ.isPending || roomsQ.isPending || bookingsQ.isPending) return <Loading />
   const error = roomTypesQ.error ?? roomsQ.error ?? bookingsQ.error
@@ -48,9 +48,11 @@ export function CalendarScreen() {
   const roomTypes = roomTypesQ.data ?? []
   const rooms = roomsQ.data ?? []
   const bookings = bookingsQ.data ?? []
+  const days = desktop ? 28 : 14
+  const gridW = days * COL_W
   const today = todayStr()
   const start: DateStr = addDaysStr(today, -2)
-  const dates: DateStr[] = Array.from({ length: DAYS }, (_, i) => addDaysStr(start, i))
+  const dates: DateStr[] = Array.from({ length: days }, (_, i) => addDaysStr(start, i))
   const todayIdx = daysBetween(start, today)
   const totalRooms = rooms.length
 
@@ -58,9 +60,9 @@ export function CalendarScreen() {
     bookings.filter((b) => OCCUPYING_STATUSES.has(b.status) && isNightCovered(b.checkIn, b.checkOut, night)).length
 
   return (
-    <div className="flex h-[calc(100svh-7rem)] flex-col">
+    <div className="flex h-[calc(100svh-7rem)] flex-col md:h-svh">
       <div className="flex-1 overflow-auto">
-        <div style={{ width: LABEL_W + GRID_W }}>
+        <div style={{ width: LABEL_W + gridW }}>
           {/* Date header */}
           <div className="sticky top-0 z-20 flex bg-background">
             <div
@@ -95,7 +97,7 @@ export function CalendarScreen() {
                 >
                   {rt.name}
                 </div>
-                <div className="bg-muted/60" style={{ width: GRID_W, height: 24 }} />
+                <div className="bg-muted/60" style={{ width: gridW, height: 24 }} />
               </div>
 
               {rooms
@@ -111,7 +113,7 @@ export function CalendarScreen() {
                     <div
                       className="relative border-b border-border"
                       style={{
-                        width: GRID_W,
+                        width: gridW,
                         backgroundImage: `repeating-linear-gradient(to right, transparent 0 ${COL_W - 1}px, var(--border) ${COL_W - 1}px ${COL_W}px)`,
                       }}
                     >
@@ -122,7 +124,7 @@ export function CalendarScreen() {
                       {bookings
                         .filter((b) => b.roomId === room.id && b.status !== 'cancelled')
                         .map((b) => (
-                          <Bar key={b.id} booking={b} start={start} />
+                          <Bar key={b.id} booking={b} start={start} gridW={gridW} />
                         ))}
                     </div>
                   </div>
@@ -136,14 +138,14 @@ export function CalendarScreen() {
   )
 }
 
-function Bar({ booking, start }: { booking: BookingVM; start: DateStr }) {
+function Bar({ booking, start, gridW }: { booking: BookingVM; start: DateStr; gridW: number }) {
   const status = booking.status
   if (status === 'cancelled') return null
 
   const x0 = daysBetween(start, booking.checkIn) * COL_W + COL_W / 2
   const x1 = daysBetween(start, booking.checkOut) * COL_W + COL_W / 2
   const left = Math.max(0, x0)
-  const right = Math.min(GRID_W, x1)
+  const right = Math.min(gridW, x1)
   const width = right - left - 4
   if (width <= 8) return null
 

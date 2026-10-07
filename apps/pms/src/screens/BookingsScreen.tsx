@@ -21,9 +21,11 @@ export function BookingsScreen() {
   const past = all.filter((b) => b.checkOut < today || b.status === 'cancelled').sort((a, b) => byCheckIn(b, a))
 
   return (
-    <div className="mx-auto max-w-md space-y-5 px-4 py-4 pb-24">
-      <Group title={t('bookings.current')} bookings={current} />
-      <Group title={t('bookings.past')} bookings={past} />
+    <div className="mx-auto w-full max-w-md px-4 py-4 pb-24 md:max-w-5xl md:px-6 md:py-6 md:pb-8">
+      <div className="space-y-5 md:grid md:grid-cols-2 md:items-start md:gap-6 md:space-y-0">
+        <Group title={t('bookings.current')} bookings={current} />
+        <Group title={t('bookings.past')} bookings={past} />
+      </div>
     </div>
   )
 }

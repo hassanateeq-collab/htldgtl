@@ -115,77 +115,87 @@ export function NewBookingScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-4 px-4 py-4 pb-24">
+    <div className="mx-auto w-full max-w-md space-y-4 px-4 py-4 pb-24 md:max-w-5xl md:px-6 md:py-6 md:pb-8">
       <Link to="/bookings" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
         <ChevronLeft className="h-4 w-4" aria-hidden />
         {t('common.back')}
       </Link>
-      <h2 className="text-xl font-semibold">{t('new.title')}</h2>
+      <h2 className="text-xl font-semibold md:text-2xl">{t('new.title')}</h2>
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <Panel title={t('new.guest')}>
-          {selectedGuest ? (
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span>{t('new.usingGuest', { name: selectedGuest.name })}</span>
-              <button
-                type="button"
-                className="text-xs text-muted-foreground underline"
-                onClick={() => {
-                  setSelectedGuest(null)
-                  setGuestName('')
-                  setGuestPhone('')
-                }}
-              >
-                {t('new.change')}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <label className="block space-y-1 text-sm">
-                <span className="text-muted-foreground">{t('new.guestName')}</span>
-                <input
-                  className={inputClass}
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  placeholder={t('new.searchHint')}
-                  autoComplete="off"
-                  autoFocus
-                />
-              </label>
-              {(guestSearch.data?.length ?? 0) > 0 && (
-                <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
-                  {guestSearch.data!.map((g) => (
-                    <li key={g.id}>
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm active:bg-accent"
-                        onClick={() => {
-                          setSelectedGuest(g)
-                          setGuestName(g.name)
-                          setGuestPhone(g.phone ?? '')
-                        }}
-                      >
-                        <span>{g.name}</span>
-                        <span className="text-xs text-muted-foreground">{g.phone}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <label className="block space-y-1 text-sm">
-                <span className="text-muted-foreground">{t('new.guestPhone')}</span>
-                <input
-                  className={inputClass}
-                  type="tel"
-                  inputMode="tel"
-                  value={guestPhone}
-                  onChange={(e) => setGuestPhone(e.target.value)}
-                  placeholder="0300 1234567"
-                />
-              </label>
-            </div>
-          )}
-        </Panel>
+      <form onSubmit={onSubmit} className="space-y-4 md:grid md:grid-cols-2 md:items-start md:gap-4 md:space-y-0">
+        <div className="space-y-4">
+          <Panel title={t('new.guest')}>
+            {selectedGuest ? (
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span>{t('new.usingGuest', { name: selectedGuest.name })}</span>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => {
+                    setSelectedGuest(null)
+                    setGuestName('')
+                    setGuestPhone('')
+                  }}
+                >
+                  {t('new.change')}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className="block space-y-1 text-sm">
+                  <span className="text-muted-foreground">{t('new.guestName')}</span>
+                  <input
+                    className={inputClass}
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder={t('new.searchHint')}
+                    autoComplete="off"
+                    autoFocus
+                  />
+                </label>
+                {(guestSearch.data?.length ?? 0) > 0 && (
+                  <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
+                    {guestSearch.data!.map((g) => (
+                      <li key={g.id}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm active:bg-accent"
+                          onClick={() => {
+                            setSelectedGuest(g)
+                            setGuestName(g.name)
+                            setGuestPhone(g.phone ?? '')
+                          }}
+                        >
+                          <span>{g.name}</span>
+                          <span className="text-xs text-muted-foreground">{g.phone}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <label className="block space-y-1 text-sm">
+                  <span className="text-muted-foreground">{t('new.guestPhone')}</span>
+                  <input
+                    className={inputClass}
+                    type="tel"
+                    inputMode="tel"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    placeholder="0300 1234567"
+                  />
+                </label>
+              </div>
+            )}
+          </Panel>
+
+          <Panel title={t('new.notes')}>
+            <textarea
+              className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </Panel>
+        </div>
 
         <Panel title={t('new.stay')}>
           <div className="grid grid-cols-2 gap-3">
@@ -276,19 +286,12 @@ export function NewBookingScreen() {
           )}
         </Panel>
 
-        <Panel title={t('new.notes')}>
-          <textarea
-            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </Panel>
-
-        {formError && <p className="text-sm text-destructive">{formError}</p>}
-
-        <Button type="submit" size="lg" className="w-full" disabled={create.isPending || freeRooms.length === 0}>
-          {create.isPending ? t('new.creating') : t('new.create')}
-        </Button>
+        <div className="space-y-3 md:col-span-2">
+          {formError && <p className="text-sm text-destructive">{formError}</p>}
+          <Button type="submit" size="lg" className="w-full md:w-auto md:px-8" disabled={create.isPending || freeRooms.length === 0}>
+            {create.isPending ? t('new.creating') : t('new.create')}
+          </Button>
+        </div>
       </form>
     </div>
   )
