@@ -1,6 +1,3 @@
-// Generated from the live schema via the Supabase MCP (generate_typescript_types).
-// Do not edit by hand — regenerate after each migration.
-
 export type Json =
   | string
   | number
@@ -103,7 +100,7 @@ export type Database = {
           {
             foreignKeyName: "booking_rooms_booking_id_fkey"
             columns: ["booking_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
@@ -115,11 +112,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "booking_rooms_room_property_fkey"
+            columns: ["property_id", "room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["property_id", "id"]
+          },
+          {
             foreignKeyName: "booking_rooms_room_type_id_fkey"
             columns: ["room_type_id"]
             isOneToOne: false
             referencedRelation: "room_types"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_type_property_fkey"
+            columns: ["property_id", "room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["property_id", "id"]
           },
         ]
       }
@@ -127,14 +138,22 @@ export type Database = {
         Row: {
           adults: number
           booking_no: string
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           check_in: string
           check_out: string
+          checked_in_at: string | null
+          checked_out_at: string | null
+          checkout_override_by: string | null
+          checkout_override_reason: string | null
           children: number
           created_at: string
           created_by: string | null
           custom_fields: Json
           guest_id: string
           id: string
+          no_show_at: string | null
           notes: string | null
           ota_ref: string | null
           property_id: string
@@ -142,18 +161,27 @@ export type Database = {
           status: Database["public"]["Enums"]["booking_status"]
           tenant_id: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           adults?: number
           booking_no: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           check_in: string
           check_out: string
+          checked_in_at?: string | null
+          checked_out_at?: string | null
+          checkout_override_by?: string | null
+          checkout_override_reason?: string | null
           children?: number
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
           guest_id: string
           id?: string
+          no_show_at?: string | null
           notes?: string | null
           ota_ref?: string | null
           property_id: string
@@ -161,18 +189,27 @@ export type Database = {
           status?: Database["public"]["Enums"]["booking_status"]
           tenant_id: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           adults?: number
           booking_no?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           check_in?: string
           check_out?: string
+          checked_in_at?: string | null
+          checked_out_at?: string | null
+          checkout_override_by?: string | null
+          checkout_override_reason?: string | null
           children?: number
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
           guest_id?: string
           id?: string
+          no_show_at?: string | null
           notes?: string | null
           ota_ref?: string | null
           property_id?: string
@@ -180,6 +217,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["booking_status"]
           tenant_id?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -197,11 +235,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bookings_tenant_guest_fkey"
+            columns: ["tenant_id", "guest_id"]
+            isOneToOne: false
+            referencedRelation: "guests"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
             foreignKeyName: "bookings_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_property_fkey"
+            columns: ["tenant_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["tenant_id", "id"]
           },
         ]
       }
@@ -215,10 +267,12 @@ export type Database = {
           created_at: string
           declared: Json
           discrepancy: Json | null
+          expected: Json | null
           id: string
           notes: string | null
           opened_at: string
           opened_by: string | null
+          opening_float: number
           property_id: string
           shift_date: string
           status: Database["public"]["Enums"]["cash_shift_status"]
@@ -234,10 +288,12 @@ export type Database = {
           created_at?: string
           declared?: Json
           discrepancy?: Json | null
+          expected?: Json | null
           id?: string
           notes?: string | null
           opened_at?: string
           opened_by?: string | null
+          opening_float?: number
           property_id: string
           shift_date?: string
           status?: Database["public"]["Enums"]["cash_shift_status"]
@@ -253,10 +309,12 @@ export type Database = {
           created_at?: string
           declared?: Json
           discrepancy?: Json | null
+          expected?: Json | null
           id?: string
           notes?: string | null
           opened_at?: string
           opened_by?: string | null
+          opening_float?: number
           property_id?: string
           shift_date?: string
           status?: Database["public"]["Enums"]["cash_shift_status"]
@@ -277,6 +335,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_shifts_tenant_property_fkey"
+            columns: ["tenant_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["tenant_id", "id"]
           },
         ]
       }
@@ -362,6 +427,10 @@ export type Database = {
       folio_items: {
         Row: {
           amount_pkr: number
+          booking_room_id: string | null
+          business_date: string
+          cash_shift_id: string | null
+          category: string
           description: string
           folio_id: string
           id: string
@@ -370,11 +439,23 @@ export type Database = {
           posted_at: string
           posted_by: string | null
           property_id: string
+          receipt_no: string | null
           reference: string | null
+          reverses_item_id: string | null
+          service_date: string | null
+          source: string
+          tax_pkr: number
           tenant_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
         }
         Insert: {
           amount_pkr: number
+          booking_room_id?: string | null
+          business_date: string
+          cash_shift_id?: string | null
+          category?: string
           description: string
           folio_id: string
           id?: string
@@ -383,11 +464,23 @@ export type Database = {
           posted_at?: string
           posted_by?: string | null
           property_id: string
+          receipt_no?: string | null
           reference?: string | null
+          reverses_item_id?: string | null
+          service_date?: string | null
+          source?: string
+          tax_pkr?: number
           tenant_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Update: {
           amount_pkr?: number
+          booking_room_id?: string | null
+          business_date?: string
+          cash_shift_id?: string | null
+          category?: string
           description?: string
           folio_id?: string
           id?: string
@@ -396,15 +489,44 @@ export type Database = {
           posted_at?: string
           posted_by?: string | null
           property_id?: string
+          receipt_no?: string | null
           reference?: string | null
+          reverses_item_id?: string | null
+          service_date?: string | null
+          source?: string
+          tax_pkr?: number
           tenant_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "folio_items_booking_room_id_fkey"
+            columns: ["booking_room_id"]
+            isOneToOne: false
+            referencedRelation: "booking_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folio_items_cash_shift_id_fkey"
+            columns: ["cash_shift_id"]
+            isOneToOne: false
+            referencedRelation: "cash_shifts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "folio_items_folio_id_fkey"
             columns: ["folio_id"]
             isOneToOne: false
             referencedRelation: "folios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folio_items_reverses_item_id_fkey"
+            columns: ["reverses_item_id"]
+            isOneToOne: false
+            referencedRelation: "folio_items"
             referencedColumns: ["id"]
           },
         ]
@@ -415,12 +537,17 @@ export type Database = {
           booking_id: string
           closed_at: string | null
           created_at: string
+          folio_no: string | null
           id: string
           property_id: string
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
           status: Database["public"]["Enums"]["folio_status"]
           tenant_id: string
           total_charges: number
           total_payments: number
+          total_tax: number
           updated_at: string
         }
         Insert: {
@@ -428,12 +555,17 @@ export type Database = {
           booking_id: string
           closed_at?: string | null
           created_at?: string
+          folio_no?: string | null
           id?: string
           property_id: string
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
           status?: Database["public"]["Enums"]["folio_status"]
           tenant_id: string
           total_charges?: number
           total_payments?: number
+          total_tax?: number
           updated_at?: string
         }
         Update: {
@@ -441,12 +573,17 @@ export type Database = {
           booking_id?: string
           closed_at?: string | null
           created_at?: string
+          folio_no?: string | null
           id?: string
           property_id?: string
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
           status?: Database["public"]["Enums"]["folio_status"]
           tenant_id?: string
           total_charges?: number
           total_payments?: number
+          total_tax?: number
           updated_at?: string
         }
         Relationships: [
@@ -461,11 +598,15 @@ export type Database = {
       }
       guests: {
         Row: {
+          address: string | null
           cnic: string | null
           created_at: string
           custom_fields: Json
           email: string | null
           id: string
+          id_expiry: string | null
+          id_number: string | null
+          id_type: string | null
           name: string
           nationality: string | null
           notes: string | null
@@ -475,11 +616,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          address?: string | null
           cnic?: string | null
           created_at?: string
           custom_fields?: Json
           email?: string | null
           id?: string
+          id_expiry?: string | null
+          id_number?: string | null
+          id_type?: string | null
           name: string
           nationality?: string | null
           notes?: string | null
@@ -489,11 +634,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          address?: string | null
           cnic?: string | null
           created_at?: string
           custom_fields?: Json
           email?: string | null
           id?: string
+          id_expiry?: string | null
+          id_number?: string | null
+          id_type?: string | null
           name?: string
           nationality?: string | null
           notes?: string | null
@@ -528,7 +677,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           created_at?: string
-          due_date?: string
+          due_date: string
           id?: string
           note?: string | null
           property_id: string
@@ -565,11 +714,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "housekeeping_tasks_room_property_fkey"
+            columns: ["property_id", "room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["property_id", "id"]
+          },
+          {
             foreignKeyName: "housekeeping_tasks_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "housekeeping_tasks_tenant_property_fkey"
+            columns: ["tenant_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["tenant_id", "id"]
           },
         ]
       }
@@ -1031,11 +1194,24 @@ export type Database = {
       properties: {
         Row: {
           address: string | null
+          check_in_time: string
+          check_out_time: string
           city: string | null
           created_at: string
           currency: string
+          early_departure_policy: string
+          email: string | null
           id: string
+          is_active: boolean
           name: string
+          ntn: string | null
+          phone: string | null
+          require_id_at_check_in: boolean
+          strn: string | null
+          tax_applies_to: string
+          tax_mode: string
+          tax_name: string | null
+          tax_rate_pct: number
           tenant_id: string
           timezone: string
           updated_at: string
@@ -1043,11 +1219,24 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          check_in_time?: string
+          check_out_time?: string
           city?: string | null
           created_at?: string
           currency?: string
+          early_departure_policy?: string
+          email?: string | null
           id?: string
+          is_active?: boolean
           name: string
+          ntn?: string | null
+          phone?: string | null
+          require_id_at_check_in?: boolean
+          strn?: string | null
+          tax_applies_to?: string
+          tax_mode?: string
+          tax_name?: string | null
+          tax_rate_pct?: number
           tenant_id: string
           timezone?: string
           updated_at?: string
@@ -1055,11 +1244,24 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          check_in_time?: string
+          check_out_time?: string
           city?: string | null
           created_at?: string
           currency?: string
+          early_departure_policy?: string
+          email?: string | null
           id?: string
+          is_active?: boolean
           name?: string
+          ntn?: string | null
+          phone?: string | null
+          require_id_at_check_in?: boolean
+          strn?: string | null
+          tax_applies_to?: string
+          tax_mode?: string
+          tax_name?: string | null
+          tax_rate_pct?: number
           tenant_id?: string
           timezone?: string
           updated_at?: string
@@ -1071,6 +1273,32 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_counters: {
+        Row: {
+          kind: string
+          last_no: number
+          property_id: string
+        }
+        Insert: {
+          kind: string
+          last_no?: number
+          property_id: string
+        }
+        Update: {
+          kind?: string
+          last_no?: number
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_counters_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
@@ -1118,6 +1346,13 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "rate_plans_tenant_property_fkey"
+            columns: ["tenant_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["tenant_id", "id"]
+          },
         ]
       }
       rates: {
@@ -1153,6 +1388,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "rates_plan_property_fkey"
+            columns: ["property_id", "rate_plan_id"]
+            isOneToOne: false
+            referencedRelation: "rate_plans"
+            referencedColumns: ["property_id", "id"]
+          },
+          {
             foreignKeyName: "rates_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
@@ -1178,6 +1420,61 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rates_type_property_fkey"
+            columns: ["property_id", "room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["property_id", "id"]
+          },
+        ]
+      }
+      room_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          from_status: Database["public"]["Enums"]["housekeeping_status"] | null
+          id: number
+          note: string | null
+          property_id: string
+          room_id: string
+          tenant_id: string
+          to_status: Database["public"]["Enums"]["housekeeping_status"]
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          from_status?:
+            | Database["public"]["Enums"]["housekeeping_status"]
+            | null
+          id?: never
+          note?: string | null
+          property_id: string
+          room_id: string
+          tenant_id: string
+          to_status: Database["public"]["Enums"]["housekeeping_status"]
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          from_status?:
+            | Database["public"]["Enums"]["housekeeping_status"]
+            | null
+          id?: never
+          note?: string | null
+          property_id?: string
+          room_id?: string
+          tenant_id?: string
+          to_status?: Database["public"]["Enums"]["housekeeping_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_status_history_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -1240,6 +1537,13 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "room_types_tenant_property_fkey"
+            columns: ["tenant_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["tenant_id", "id"]
+          },
         ]
       }
       rooms: {
@@ -1300,6 +1604,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rooms_tenant_property_fkey"
+            columns: ["tenant_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "rooms_type_property_fkey"
+            columns: ["property_id", "room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["property_id", "id"]
           },
         ]
       }
@@ -1574,11 +1892,88 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _assert_booking_writer: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
+      _assert_cashier: { Args: { p_tenant_id: string }; Returns: undefined }
+      _assign_room: {
+        Args: {
+          p_booking_id: string
+          p_check_in: string
+          p_check_out: string
+          p_rate: number
+          p_room_id: string
+        }
+        Returns: undefined
+      }
+      _post_room_nights: {
+        Args: {
+          p_booking_id: string
+          p_from: string
+          p_rate: number
+          p_to: string
+        }
+        Returns: number
+      }
+      _shift_expected: { Args: { p_shift_id: string }; Returns: Json }
+      _validate_method_amounts: {
+        Args: { p: Json; p_label: string }
+        Returns: Json
+      }
+      _void_room_nights: {
+        Args: { p_booking_id: string; p_from: string; p_reason: string }
+        Returns: number
+      }
+      booking_transition_allowed: {
+        Args: {
+          p_from: Database["public"]["Enums"]["booking_status"]
+          p_role: Database["public"]["Enums"]["tenant_role"]
+          p_to: Database["public"]["Enums"]["booking_status"]
+        }
+        Returns: boolean
+      }
+      close_cash_shift: {
+        Args: { p_declared: Json; p_notes?: string; p_shift_id: string }
+        Returns: Json
+      }
+      close_folio: { Args: { p_folio_id: string }; Returns: undefined }
+      confirm_cash_shift: {
+        Args: { p_confirmed: Json; p_notes?: string; p_shift_id: string }
+        Returns: Json
+      }
+      create_booking: {
+        Args: {
+          p_adults: number
+          p_check_in: string
+          p_check_in_now?: boolean
+          p_check_out: string
+          p_children?: number
+          p_deposit?: number
+          p_deposit_method?: Database["public"]["Enums"]["payment_method"]
+          p_guest_id?: string
+          p_guest_id_number?: string
+          p_guest_id_type?: string
+          p_guest_name?: string
+          p_guest_nationality?: string
+          p_guest_phone?: string
+          p_nightly_rate: number
+          p_notes?: string
+          p_property_id: string
+          p_room_id: string
+          p_source: Database["public"]["Enums"]["booking_source"]
+        }
+        Returns: string
+      }
       current_role_in_tenant: {
         Args: never
         Returns: Database["public"]["Enums"]["tenant_role"]
       }
       current_tenant_id: { Args: never; Returns: string }
+      daily_report: {
+        Args: { p_date?: string; p_property_id: string }
+        Returns: Json
+      }
       is_platform_admin: { Args: never; Returns: boolean }
       my_memberships: {
         Args: never
@@ -1597,6 +1992,21 @@ export type Database = {
           tenant_id: string
         }[]
       }
+      next_booking_no: { Args: { p_property_id: string }; Returns: string }
+      next_doc_no: {
+        Args: { p_kind: string; p_property_id: string }
+        Returns: string
+      }
+      normalize_phone: { Args: { p_input: string }; Returns: string }
+      open_cash_shift: {
+        Args: {
+          p_notes?: string
+          p_opening_float?: number
+          p_property_id: string
+        }
+        Returns: string
+      }
+      property_today: { Args: { p_property_id: string }; Returns: string }
       provision_tenant: {
         Args: {
           p_city?: string
@@ -1608,9 +2018,40 @@ export type Database = {
         }
         Returns: string
       }
+      reopen_folio: {
+        Args: { p_folio_id: string; p_reason: string }
+        Returns: undefined
+      }
+      run_billing_transitions: { Args: never; Returns: number }
       set_active_tenant: { Args: { p_slug: string }; Returns: string }
+      set_booking_status: {
+        Args: {
+          p_booking_id: string
+          p_reason?: string
+          p_status: Database["public"]["Enums"]["booking_status"]
+        }
+        Returns: undefined
+      }
       tenant_access_level: { Args: never; Returns: string }
       tenant_has_feature: { Args: { p_key: string }; Returns: boolean }
+      update_booking: {
+        Args: {
+          p_adults: number
+          p_booking_id: string
+          p_check_in: string
+          p_check_out: string
+          p_children?: number
+          p_nightly_rate: number
+          p_notes?: string
+          p_room_id: string
+          p_source: Database["public"]["Enums"]["booking_source"]
+        }
+        Returns: undefined
+      }
+      void_folio_item: {
+        Args: { p_item_id: string; p_reason: string }
+        Returns: undefined
+      }
     }
     Enums: {
       booking_source: "walk_in" | "phone" | "whatsapp" | "ota" | "direct"
@@ -1623,7 +2064,7 @@ export type Database = {
       cash_shift_status: "open" | "handed_over" | "confirmed"
       custom_field_entity: "guest" | "booking"
       custom_field_type: "text" | "number" | "date" | "select" | "boolean"
-      folio_item_kind: "charge" | "payment"
+      folio_item_kind: "charge" | "payment" | "discount" | "refund"
       folio_status: "open" | "closed"
       housekeeping_status: "clean" | "dirty" | "inspected" | "out_of_order"
       invoice_status: "draft" | "sent" | "paid" | "void"
@@ -1788,7 +2229,7 @@ export const Constants = {
       cash_shift_status: ["open", "handed_over", "confirmed"],
       custom_field_entity: ["guest", "booking"],
       custom_field_type: ["text", "number", "date", "select", "boolean"],
-      folio_item_kind: ["charge", "payment"],
+      folio_item_kind: ["charge", "payment", "discount", "refund"],
       folio_status: ["open", "closed"],
       housekeeping_status: ["clean", "dirty", "inspected", "out_of_order"],
       invoice_status: ["draft", "sent", "paid", "void"],

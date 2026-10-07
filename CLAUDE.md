@@ -10,8 +10,9 @@ Multi-tenant Property Management System (PMS) sold as SaaS to small and mid-size
 - **Business model:** monthly subscription in PKR, collected manually (bank transfer, Raast, JazzCash, Easypaisa, cash) and recorded by the operator. No card processor. A trial converts to paid when the operator records the first payment.
 
 ## Navigation
-- `docs/decisions/` — ADRs (append-only). 0001 multi-tenancy · 0002 feature flags · 0003 data-only customization · 0004 subscription state machine · 0005 one WuBook account.
-- `docs/architecture/` — `data-model.md` (ERD + RLS patterns) · `feature-flags.md` · `billing.md`.
+- `docs/decisions/` — ADRs (append-only). 0001 multi-tenancy · 0002 feature flags · 0003 data-only customization · 0004 subscription state machine · 0005 one WuBook account · 0006 financial integrity model (append-only folio, per-night charges, hotel business day, lifecycle in the database).
+- `docs/architecture/` — `data-model.md` (ERD + RLS patterns + function catalogue) · `feature-flags.md` · `billing.md`.
+- `docs/reviews/` — code reviews; `2026-10-07-full-review.md` holds the ranked findings and the four-release rewrite plan.
 - `docs/scope/v1-scope.md` — the exact screen list for v1.
 - `docs/state/CURRENT.md` — live status, **read first** each session.
 - `apps/pms` — tenant app (built Phase 2). `apps/admin` — operator console (Phase 1). `packages/` — shared types, feature keys, UI primitives, i18n (Phase 1).

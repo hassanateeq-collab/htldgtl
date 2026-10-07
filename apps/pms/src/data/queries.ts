@@ -97,6 +97,7 @@ interface FolioItemRow {
   method: PaymentMethod | null
   reference: string | null
   posted_at: string
+  voided_at: string | null
 }
 
 interface FolioRow {
@@ -222,7 +223,7 @@ export function useFolio(bookingId: string | undefined) {
       const { data, error } = await supabase
         .from('folios')
         .select(
-          'id, status, total_charges, total_payments, balance, items:folio_items(id, kind, description, amount_pkr, method, reference, posted_at)',
+          'id, status, total_charges, total_payments, balance, items:folio_items(id, kind, description, amount_pkr, method, reference, posted_at, voided_at)',
         )
         .eq('booking_id', bookingId!)
         .maybeSingle()
@@ -235,7 +236,9 @@ export function useFolio(bookingId: string | undefined) {
         totalCharges: Number(row.total_charges),
         totalPayments: Number(row.total_payments),
         balance: Number(row.balance),
-        items: [...row.items]
+        // Voided rows stay in the database for the audit trail; the folio view shows live items only.
+        items: row.items
+          .filter((i) => !i.voided_at)
           .sort((a, b) => a.posted_at.localeCompare(b.posted_at))
           .map((i) => ({
             id: i.id,
