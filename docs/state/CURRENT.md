@@ -5,6 +5,7 @@
 **Current focus:** polish from real use by Hassan; then `apps/admin`.
 
 ## Where we are
+- **Live on Vercel (2026-10-08): `https://hotel-digital-pms.vercel.app`.** Project `hotel-digital-pms` (team `hassanateeq-collabs-projects`, id `prj_LbUOHEB2n57kxwH1UYYlZa8WuRJX`), linked to GitHub `main` → every push to `main` deploys production; other branches get preview deployments (previews require a Vercel login, production is public). Root directory `apps/pms`, framework Vite, env `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (publishable key) for all environments. `apps/pms/vercel.json` holds the SPA rewrite, immutable asset caching and security headers. Team sign-in: `https://hotel-digital-pms.vercel.app/t/paramount/login`.
 - **Releases B–D — the app rewrite (2026-10-08).** `apps/pms` rebuilt on the Release A schema:
   - **Foundation:** typed Supabase client (`createClient<Database>`), hotel clock (`useHotelToday`, `lib/clock.ts`, never the device date), `permissions.ts` abilities + `can()`, tenant/property-scoped query keys with server-side filtering, search and paging over `v_bookings` / `v_guests` / `v_rooms_board` (migration 16), `tenant_members()` (17), mutations that await invalidation, `HD` error codes → friendly messages (`lib/errors.ts`), toasts (sonner), `ScreenErrorBoundary`, lazy routes, design tokens in OKLCH with semantic status / housekeeping / money roles, 44 px targets, Sheet = vaul drawer on phones / Radix dialog on desktop, `PageHeader` driving the mobile top bar, centre **New** tab (walk-in / new booking) instead of a floating button.
   - **Front desk:** Today (KPIs incl. due / collected / free tonight, *Needs attention* for late arrivals and overstays, quick check-in / check-out / collect), Rooms board + room sheet (status, walk-in here, book here), Bookings (search, filter chips in the URL, grouped list, paging), Calendar (two-week window, HK dot, hatched no-shows, tap a cell to book), Booking detail (guest / stay / folio cards, overflow menu, state-driven action bar), **Check-in sheet** (room readiness, ID capture, early *and late* arrival handling, deposit), **Check-out sheet** (projected balance incl. early / late departure, collect or refund, owner/manager override with reason, print), add charge / payment / discount / refund, void with reason, reopen / close folio, move room, cancel / no-show / reinstate, New booking + walk-in (phone-first guest lookup, room picker that never substitutes silently, deposit, create-and-check-in), Edit booking, Receipt / statement and registration card print views, Guests list + detail with ID editing.
@@ -18,7 +19,7 @@
 - `apps/admin` not scaffolded yet.
 
 ## Demo sign-in
-- Link (dev server on Hassan's Mac): `http://localhost:5173/t/paramount/login` — hotel code `paramount`.
+- Live: `https://hotel-digital-pms.vercel.app/t/paramount/login` — hotel code `paramount`. Local dev server: `http://localhost:5173/t/paramount/login`.
 - Hassan's own account is an owner member of Paramount. Demo owner `owner@demo.test`; dev password in gitignored `supabase/.env.local`. Rotate/remove the demo account before real customers go live.
 
 ## Decisions locked with Hassan
@@ -41,7 +42,8 @@
 6. Phase 4: WuBook port (ADR 0005), WhatsApp / email messaging.
 
 ## For Hassan
-- **Enable leaked-password protection** in Supabase → Authentication → Settings.
+- **Team accounts:** staff sign in with their own email + password. Until the invitation flow exists, accounts are created by Hamsun (Supabase → Authentication → Users → *Add user*, then a `memberships` row for tenant `paramount` with the role) — or ask Claude to create them from a list of emails and roles.
+- **Enable leaked-password protection** in Supabase → Authentication → Settings. Optionally set Authentication → URL configuration → Site URL to `https://hotel-digital-pms.vercel.app` (only matters once password-reset emails exist).
 - The GitHub repo is **public** — consider making it private.
 - Central Residence's **real room numbers/counts** (current 17 are assumed).
 - Note the new rule: a guest who checks in and leaves the same day is charged one night.
@@ -49,7 +51,7 @@
 ## Open items (tracked)
 - Per-plan / per-add-on PKR prices (seeded at 0, edited in admin).
 - Real platform domain.
-- `npm audit` findings — before first deploy.
+- `npm audit` findings; main bundle is 641 kB minified (189 kB gzip) — split vendor chunks before customers join.
 - WuBook per-account property limit / partner terms before scaling the channel add-on (ADR 0005).
 - Access to `~/hamsun-guest-manager-git` and `~/hamsun-channel-hub` for the Phase 4 WuBook port.
 - Resend (email) + whapi (WhatsApp) accounts/credentials.
