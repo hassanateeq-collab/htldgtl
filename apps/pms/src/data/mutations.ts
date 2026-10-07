@@ -1,10 +1,11 @@
-// Write actions. Status changes and booking creation go through SECURITY
-// INVOKER database functions (RLS applies as the caller); folio items are
-// plain inserts (tenant/property are filled from the folio by trigger).
+// Write actions. Booking creation/updates and status changes go through
+// SECURITY INVOKER database functions (RLS applies as the caller); folio items
+// and guest edits are plain writes under RLS.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { t, type BookingSource, type BookingStatus, type MessageKey, type PaymentMethod } from '@hotel-digital/shared'
 import { supabase } from '@/lib/supabase'
 import { keys } from './queries'
+import type { FolioItemKind } from './types'
 
 export type ActionErrorKind = 'room_taken' | 'balance_due' | 'forbidden' | 'bad_transition' | 'unknown'
 
@@ -27,7 +28,9 @@ export function translateError(e: unknown): ActionError {
   if (code === '42501' || /row-level security|not permitted|permission denied/i.test(message)) {
     return new ActionError('forbidden', message)
   }
-  if (/cannot go from|not found/i.test(message)) return new ActionError('bad_transition', message)
+  if (/cannot go from|not found|is locked|no longer editable/i.test(message)) {
+    return new ActionError('bad_transition', message)
+  }
   return new ActionError('unknown', message)
 }
 
@@ -54,7 +57,7 @@ export function useSetBookingStatus(propertyId: string) {
 export interface NewFolioItem {
   folioId: string
   bookingId: string
-  kind: 'charge' | 'payment'
+  kind: FolioItemKind
   description: string
   amountPkr: number
   method: PaymentMethod | null
@@ -77,6 +80,7 @@ export function useAddFolioItem(propertyId: string) {
     },
     onSuccess: (_data, { bookingId }) => {
       void queryClient.invalidateQueries({ queryKey: keys.folio(bookingId) })
+      void queryClient.invalidateQueries({ queryKey: keys.bookings(propertyId) })
       void queryClient.invalidateQueries({ queryKey: ['payments-today', propertyId] })
     },
   })
@@ -94,6 +98,8 @@ export interface NewBookingInput {
   guestName: string | null
   guestPhone: string | null
   notes: string | null
+  deposit: number
+  depositMethod: PaymentMethod | null
 }
 
 export function useCreateBooking(propertyId: string) {
@@ -112,11 +118,83 @@ export function useCreateBooking(propertyId: string) {
         p_guest_name: input.guestName,
         p_guest_phone: input.guestPhone,
         p_notes: input.notes,
+        p_deposit: input.deposit,
+        p_deposit_method: input.depositMethod,
       })
       if (error) throw translateError(error)
       return data as string
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.bookings(propertyId) })
+      void queryClient.invalidateQueries({ queryKey: keys.guests() })
+      void queryClient.invalidateQueries({ queryKey: ['payments-today', propertyId] })
+    },
+  })
+}
+
+export interface UpdateBookingInput {
+  bookingId: string
+  roomId: string
+  checkIn: string
+  checkOut: string
+  adults: number
+  source: BookingSource
+  nightlyRate: number
+  notes: string | null
+}
+
+export function useUpdateBooking(propertyId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: UpdateBookingInput) => {
+      const { error } = await supabase.rpc('update_booking', {
+        p_booking_id: input.bookingId,
+        p_room_id: input.roomId,
+        p_check_in: input.checkIn,
+        p_check_out: input.checkOut,
+        p_adults: input.adults,
+        p_source: input.source,
+        p_nightly_rate: input.nightlyRate,
+        p_notes: input.notes,
+      })
+      if (error) throw translateError(error)
+    },
+    onSuccess: (_data, { bookingId }) => {
+      void queryClient.invalidateQueries({ queryKey: keys.bookings(propertyId) })
+      void queryClient.invalidateQueries({ queryKey: keys.folio(bookingId) })
+    },
+  })
+}
+
+export interface UpdateGuestInput {
+  id: string
+  name: string
+  phone: string | null
+  email: string | null
+  nationality: string | null
+  cnic: string | null
+  passport: string | null
+}
+
+export function useUpdateGuest(propertyId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: UpdateGuestInput) => {
+      const { error } = await supabase
+        .from('guests')
+        .update({
+          name: input.name,
+          phone: input.phone,
+          email: input.email,
+          nationality: input.nationality,
+          cnic: input.cnic,
+          passport: input.passport,
+        })
+        .eq('id', input.id)
+      if (error) throw translateError(error)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.guests() })
       void queryClient.invalidateQueries({ queryKey: keys.bookings(propertyId) })
     },
   })

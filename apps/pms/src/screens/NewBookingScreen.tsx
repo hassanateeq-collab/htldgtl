@@ -1,8 +1,16 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft } from 'lucide-react'
-import { BOOKING_SOURCES, formatPKR, t, toPakistanE164, type BookingSource } from '@hotel-digital/shared'
+import {
+  BOOKING_SOURCES,
+  PAYMENT_METHODS,
+  formatPKR,
+  t,
+  toPakistanE164,
+  type BookingSource,
+  type PaymentMethod,
+} from '@hotel-digital/shared'
 import { Button } from '@/components/ui/button'
 import { Panel } from '@/components/Panel'
 import { ErrorNote, Loading } from '@/components/State'
@@ -11,7 +19,7 @@ import { useBookings, useRooms, useRoomTypes } from '@/data/queries'
 import { actionErrorLabel, useCreateBooking } from '@/data/mutations'
 import { OCCUPYING_STATUSES } from '@/data/types'
 import { addDaysStr, nightsBetween, todayStr } from '@/lib/dates'
-import { sourceLabel } from '@/lib/labels'
+import { methodLabel, sourceLabel } from '@/lib/labels'
 import { supabase } from '@/lib/supabase'
 
 const inputClass =
@@ -23,8 +31,11 @@ interface GuestHit {
   phone: string | null
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
 export function NewBookingScreen() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const { property } = useTenant()
   const roomTypesQ = useRoomTypes(property.id)
   const roomsQ = useRooms(property.id)
@@ -32,17 +43,22 @@ export function NewBookingScreen() {
   const create = useCreateBooking(property.id)
 
   const today = todayStr()
+  const paramCheckIn = params.get('checkIn')
+  const initialCheckIn = paramCheckIn && DATE_RE.test(paramCheckIn) ? paramCheckIn : today
+
   const [guestName, setGuestName] = useState('')
   const [guestPhone, setGuestPhone] = useState('')
   const [selectedGuest, setSelectedGuest] = useState<GuestHit | null>(null)
-  const [checkIn, setCheckIn] = useState(today)
-  const [checkOut, setCheckOut] = useState(addDaysStr(today, 1))
+  const [checkIn, setCheckIn] = useState(initialCheckIn)
+  const [checkOut, setCheckOut] = useState(addDaysStr(initialCheckIn, 1))
   const [roomTypeId, setRoomTypeId] = useState('')
-  const [roomId, setRoomId] = useState('')
+  const [roomId, setRoomId] = useState(params.get('room') ?? '')
   const [adults, setAdults] = useState(2)
   const [source, setSource] = useState<BookingSource>('walk_in')
   const [rate, setRate] = useState('')
   const [notes, setNotes] = useState('')
+  const [deposit, setDeposit] = useState('')
+  const [depositMethod, setDepositMethod] = useState<PaymentMethod>('cash')
   const [formError, setFormError] = useState<string | null>(null)
 
   const term = guestName.trim()
@@ -64,7 +80,8 @@ export function NewBookingScreen() {
   const roomTypes = roomTypesQ.data ?? []
   const rooms = roomsQ.data ?? []
   const bookings = bookingsQ.data ?? []
-  const effectiveTypeId = roomTypeId || roomTypes[0]?.id || ''
+  const preselectedRoom = rooms.find((r) => r.id === roomId)
+  const effectiveTypeId = roomTypeId || preselectedRoom?.roomTypeId || roomTypes[0]?.id || ''
   const selectedType = roomTypes.find((rt) => rt.id === effectiveTypeId)
   const nights = nightsBetween(checkIn, checkOut)
 
@@ -82,6 +99,7 @@ export function NewBookingScreen() {
 
   const effectiveRoomId = freeRooms.some((r) => r.id === roomId) ? roomId : (freeRooms[0]?.id ?? '')
   const effectiveRate = rate === '' ? (selectedType?.baseRatePkr ?? 0) : Number(rate)
+  const depositValue = Number(deposit) || 0
 
   if (roomTypesQ.isPending || roomsQ.isPending || bookingsQ.isPending) return <Loading />
   const loadError = roomTypesQ.error ?? roomsQ.error ?? bookingsQ.error
@@ -108,6 +126,8 @@ export function NewBookingScreen() {
         guestName: selectedGuest ? null : guestName.trim(),
         guestPhone: selectedGuest ? null : rawPhone ? (toPakistanE164(rawPhone) ?? rawPhone) : null,
         notes: notes.trim() || null,
+        deposit: depositValue > 0 ? depositValue : 0,
+        depositMethod: depositValue > 0 ? depositMethod : null,
       })
       navigate(`/bookings/${id}`, { replace: true })
     } catch (err) {
@@ -123,8 +143,10 @@ export function NewBookingScreen() {
       </Link>
       <h2 className="text-xl font-semibold md:text-2xl">{t('new.title')}</h2>
 
+      {/* Mobile order: guest → stay → advance payment → notes (the deposit depends on the total).
+          Desktop: guest / payment / notes stack in the left column, stay spans the right. */}
       <form onSubmit={onSubmit} className="space-y-4 md:grid md:grid-cols-2 md:items-start md:gap-4 md:space-y-0">
-        <div className="space-y-4">
+        <div className="md:col-start-1">
           <Panel title={t('new.guest')}>
             {selectedGuest ? (
               <div className="flex items-center justify-between gap-3 text-sm">
@@ -188,17 +210,9 @@ export function NewBookingScreen() {
               </div>
             )}
           </Panel>
-
-          <Panel title={t('new.notes')}>
-            <textarea
-              className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </Panel>
         </div>
 
-        <Panel title={t('new.stay')}>
+        <Panel title={t('new.stay')} className="md:col-start-2 md:row-start-1 md:row-span-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1 text-sm">
               <span className="text-muted-foreground">{t('new.checkIn')}</span>
@@ -283,9 +297,54 @@ export function NewBookingScreen() {
                 rate: formatPKR(effectiveRate),
                 total: formatPKR(nights * effectiveRate),
               })}
+              {depositValue > 0 ? ` · ${t('bookings.due', { amount: formatPKR(Math.max(nights * effectiveRate - depositValue, 0)) })}` : ''}
             </p>
           )}
         </Panel>
+
+        <div className="md:col-start-1">
+          <Panel title={t('new.deposit')}>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block space-y-1 text-sm">
+                <span className="text-muted-foreground">{t('new.depositAmount')}</span>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={deposit}
+                  onChange={(e) => setDeposit(e.target.value)}
+                  placeholder="0"
+                />
+              </label>
+              <label className="block space-y-1 text-sm">
+                <span className="text-muted-foreground">{t('new.depositMethod')}</span>
+                <select
+                  className={inputClass}
+                  value={depositMethod}
+                  onChange={(e) => setDepositMethod(e.target.value as PaymentMethod)}
+                  disabled={depositValue <= 0}
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {methodLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </Panel>
+        </div>
+
+        <div className="md:col-start-1">
+          <Panel title={t('new.notes')}>
+            <textarea
+              className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </Panel>
+        </div>
 
         <div className="space-y-3 md:col-span-2">
           {formError && <p className="text-sm text-destructive">{formError}</p>}

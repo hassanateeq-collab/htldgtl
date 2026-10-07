@@ -1,18 +1,19 @@
 # Current status
 
 **Last updated:** 2026-10-07
-**Phase:** 2 — core PMS: front-desk actions live, responsive desktop tier, early-departure rule
+**Phase:** 2 — core PMS: booking management (edit, deposits, balances, receipts, guests)
 **Current focus:** Housekeeping board, cash handover and daily report (the remaining core control screens), then the admin console.
 
 ## Where we are
+- **Booking management (2026-10-07).** Migration 9: folio kinds `discount` / `refund` with net totals, advance payment on `create_booking()`, SECURITY INVOKER `update_booking()` (move room, change dates / rate / adults / source / notes; EXCLUDE re-validates; room charge follows; check-in locked in-house). App: **Calendar** — week back/forward, Today, jump-to-date, tap an empty cell to start a booking for that room and night, balance-due dot on bars, desktop range + hint. **Bookings** — "Balance due" group (in-house / departed guests who owe) with the total, Due badge on rows. **New booking** — optional advance payment (amount + method), prefilled from the calendar. **Booking detail** — Edit, Receipt, View guest; folio posting of charge / payment / discount / refund. **Edit booking** screen. **Receipt** — print view using `tenant_branding` (legal name, address, NTN/STRN) with charges/payments columns and PAID / balance footer. **Guests** — searchable list (name / phone) with stays, last stay and amount due; guest detail with editable profile and booking history.
 - **Early departure releases the room (2026-10-07).** Migration 8: checking out before the planned date sets the stay's actual end to today on the booking and its room assignment, so the no-double-book constraint frees the remaining nights; same-day departures become zero-night rows (date checks relaxed to `check_out >= check_in`; `create_booking()` still requires ≥ 1 night). The New Booking free-room filter mirrors the constraint exactly. Applied retroactively to CR-1015.
 - **Responsive desktop layout (2026-10-07).** Mobile unchanged; at `md`+ a fixed left sidebar (names, nav, New booking), wider content, Today's lists side by side, Rooms as a card grid, two-column detail/New Booking, 28-day calendar at full height.
 - **Booking actions live (2026-10-07).** Migration 7: SECURITY INVOKER `create_booking()` and `set_booking_status()`; New Booking screen, detail actions with two-tap confirm, inline Add payment / Add charge, "+" button. Verified live as the demo owner (CR-1015 created → checked in → paid → checked out).
-- **Regression suites** (`supabase/tests/`): platform 15, operational 11, booking actions 6 = **32 checks**, computing expectations at run time.
+- **Regression suites** (`supabase/tests/`): platform 15, operational 11, booking actions 15 = **41 checks**, computing expectations at run time.
 - **App ↔ DB wired:** `/t/<slug>/login`, `set_active_tenant()` claim + JWT refresh, guards, tenant picker; all core screens read through RLS via React Query. Generated DB types in `packages/shared` (client not yet generic-typed).
-- **Database live:** project `hotel-digital` (`wdwvnhqtzeivdylhtwxq`, ap-south-1); eight migrations applied + mirrored (`docs/architecture/data-model.md`).
+- **Database live:** project `hotel-digital` (`wdwvnhqtzeivdylhtwxq`, ap-south-1); nine migrations applied + mirrored (`docs/architecture/data-model.md`).
 - **Seeded:** platform admin; Paramount Hospitality → Central Residence (4 room types, 17 rooms, 15 bookings, folios); test tenant Seaview. Seed dates relative to 2026-10-06.
-- **GitHub:** `hassanateeq-collab/htldgtl` (**public**). Early-departure fix to be committed next.
+- **GitHub:** `hassanateeq-collab/htldgtl` (**public**), main up to date.
 - `apps/admin` not scaffolded yet.
 
 ## Demo sign-in
@@ -35,7 +36,7 @@
 3. **Daily report** — arrivals, departures, occupancy, cash by method.
 4. **Admin console** (`apps/admin`): provision tenant, plans/add-on overrides, record payments, approve signup requests, audit views.
 5. Type the client with the generated `Database` type; route-level code splitting (~500 KB bundle warning).
-6. Billing job (`pg_cron` daily 06:00 PKT) + reminders. Folio credits/adjustments for early departures. Demo-data freshness helper.
+6. Billing job (`pg_cron` daily 06:00 PKT) + reminders. Demo-data freshness helper. Receipt: logo + per-tenant footer text; WhatsApp/email send once the messaging accounts exist.
 
 ## For Hassan
 - **Enable leaked-password protection** in Supabase → Authentication → Settings.

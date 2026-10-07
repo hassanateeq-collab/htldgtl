@@ -29,6 +29,14 @@ export interface AccessVM {
   accessLevel: 'full' | 'read_only' | 'none'
 }
 
+export interface BrandingVM {
+  legalName: string | null
+  address: string | null
+  ntn: string | null
+  strn: string | null
+  logoUrl: string | null
+}
+
 export interface RoomTypeVM {
   id: string
   name: string
@@ -57,6 +65,14 @@ export interface GuestVM {
   nationality: string | null
 }
 
+/** Full guest record for the Guests screens. */
+export interface GuestRecordVM extends GuestVM {
+  cnic: string | null
+  passport: string | null
+  notes: string | null
+  createdAt: string
+}
+
 export interface BookingVM {
   id: string
   bookingNo: string
@@ -73,11 +89,16 @@ export interface BookingVM {
   roomTypeId: string | null
   roomTypeName: string | null
   nightlyRatePkr: number
+  /** Stored folio totals (null until the folio exists). */
+  balance: number | null
+  folioStatus: 'open' | 'closed' | null
 }
+
+export type FolioItemKind = 'charge' | 'payment' | 'discount' | 'refund'
 
 export interface FolioItemVM {
   id: string
-  kind: 'charge' | 'payment'
+  kind: FolioItemKind
   description: string
   amountPkr: number
   method: PaymentMethod | null
@@ -113,3 +134,7 @@ export const OCCUPYING_STATUSES: ReadonlySet<BookingStatus> = new Set([
   'checked_in',
   'checked_out',
 ])
+
+/** A booking owes money when its folio balance is positive and the stay is real. */
+export const owesMoney = (b: BookingVM) =>
+  (b.balance ?? 0) > 0 && b.status !== 'cancelled' && b.status !== 'no_show'

@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
-import { PAYMENT_METHODS, formatPKR, t, type BookingStatus, type PaymentMethod } from '@hotel-digital/shared'
+import { ChevronLeft, Pencil, Printer, User } from 'lucide-react'
+import { PAYMENT_METHODS, formatPKR, t, type BookingStatus, type MessageKey, type PaymentMethod } from '@hotel-digital/shared'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import { Panel } from '@/components/Panel'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -11,6 +11,7 @@ import { ErrorNote, Loading } from '@/components/State'
 import { useTenant } from '@/data/tenant'
 import { useBookings, useFolio } from '@/data/queries'
 import { actionErrorLabel, useAddFolioItem, useSetBookingStatus } from '@/data/mutations'
+import type { FolioItemKind, FolioItemVM } from '@/data/types'
 import { fmtInstantShort, fmtShort, nightsBetween } from '@/lib/dates'
 import { methodLabel, nightsLabel, sourceLabel } from '@/lib/labels'
 
@@ -19,6 +20,25 @@ const inputClass =
 
 const OPERATOR_ROLES = ['owner', 'manager', 'front_desk']
 const CASHIER_ROLES = ['owner', 'manager', 'front_desk', 'accounts']
+const KINDS: FolioItemKind[] = ['payment', 'charge', 'discount', 'refund']
+const kindLabel = (k: FolioItemKind) => t(`kind.${k}` as MessageKey)
+const needsMethod = (k: FolioItemKind) => k === 'payment' || k === 'refund'
+
+function itemLabel(item: FolioItemVM): string {
+  if (needsMethod(item.kind)) {
+    // "Advance payment · Cash · 07 Oct" — a specific description wins over the generic kind name.
+    const head = item.description && item.description !== kindLabel(item.kind) ? item.description : kindLabel(item.kind)
+    const base = `${head} · ${methodLabel(item.method ?? 'cash')}`
+    return `${base}${item.reference ? ` · ${item.reference}` : ''} · ${fmtInstantShort(item.postedAt)}`
+  }
+  if (item.kind === 'discount') return `${kindLabel('discount')} · ${item.description}`
+  return item.description
+}
+
+function itemValue(item: FolioItemVM): string {
+  const negative = item.kind === 'payment' || item.kind === 'discount'
+  return `${negative ? '− ' : item.kind === 'refund' ? '+ ' : ''}${formatPKR(item.amountPkr)}`
+}
 
 export function BookingDetailScreen() {
   const { id } = useParams()
@@ -28,7 +48,8 @@ export function BookingDetailScreen() {
   const setStatus = useSetBookingStatus(property.id)
   const addItem = useAddFolioItem(property.id)
 
-  const [folioMode, setFolioMode] = useState<'payment' | 'charge' | null>(null)
+  const [posting, setPosting] = useState(false)
+  const [kind, setKind] = useState<FolioItemKind>('payment')
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [reference, setReference] = useState('')
@@ -64,6 +85,7 @@ export function BookingDetailScreen() {
   const full = access?.accessLevel === 'full'
   const canOperate = full && !!role && OPERATOR_ROLES.includes(role)
   const canPost = full && !!role && CASHIER_ROLES.includes(role) && folio?.status === 'open'
+  const editable = canOperate && (booking.status === 'confirmed' || booking.status === 'checked_in')
   const balance = folio?.balance ?? 0
 
   async function changeStatus(status: BookingStatus) {
@@ -76,17 +98,18 @@ export function BookingDetailScreen() {
     }
   }
 
-  function resetFolioForm() {
-    setFolioMode(null)
+  function resetForm() {
+    setPosting(false)
+    setKind('payment')
     setAmount('')
     setReference('')
     setDescription('')
     setMethod('cash')
   }
 
-  async function saveFolioItem(e: FormEvent) {
+  async function saveItem(e: FormEvent) {
     e.preventDefault()
-    if (!folio || !folioMode || !booking) return
+    if (!folio || !booking) return
     const value = Number(amount)
     if (!(value > 0)) return
     setActionError(null)
@@ -94,13 +117,13 @@ export function BookingDetailScreen() {
       await addItem.mutateAsync({
         folioId: folio.id,
         bookingId: booking.id,
-        kind: folioMode,
+        kind,
         amountPkr: value,
-        method: folioMode === 'payment' ? method : null,
-        reference: folioMode === 'payment' ? reference.trim() || null : null,
-        description: folioMode === 'payment' ? 'Payment' : description.trim() || 'Charge',
+        method: needsMethod(kind) ? method : null,
+        reference: needsMethod(kind) ? reference.trim() || null : null,
+        description: needsMethod(kind) ? kindLabel(kind) : description.trim() || kindLabel(kind),
       })
-      resetFolioForm()
+      resetForm()
     } catch (err) {
       setActionError(actionErrorLabel(err))
     }
@@ -121,36 +144,55 @@ export function BookingDetailScreen() {
         </div>
       </div>
 
-      {canOperate && (booking.status === 'confirmed' || booking.status === 'checked_in') && (
-        <div className="flex flex-wrap gap-2">
-          {booking.status === 'confirmed' && (
-            <>
-              <Button onClick={() => void changeStatus('checked_in')} disabled={setStatus.isPending}>
-                {setStatus.isPending ? t('actions.working') : t('actions.checkIn')}
-              </Button>
-              <ConfirmButton onConfirm={() => void changeStatus('no_show')} busy={setStatus.isPending}>
-                {t('actions.noShow')}
-              </ConfirmButton>
-              <ConfirmButton onConfirm={() => void changeStatus('cancelled')} busy={setStatus.isPending}>
-                {t('actions.cancel')}
-              </ConfirmButton>
-            </>
-          )}
-          {booking.status === 'checked_in' && (
-            <ConfirmButton variant="default" onConfirm={() => void changeStatus('checked_out')} busy={setStatus.isPending}>
-              {t('actions.checkOut')}
+      <div className="flex flex-wrap gap-2">
+        {editable && booking.status === 'confirmed' && (
+          <>
+            <Button onClick={() => void changeStatus('checked_in')} disabled={setStatus.isPending}>
+              {setStatus.isPending ? t('actions.working') : t('actions.checkIn')}
+            </Button>
+            <ConfirmButton onConfirm={() => void changeStatus('no_show')} busy={setStatus.isPending}>
+              {t('actions.noShow')}
             </ConfirmButton>
-          )}
-        </div>
-      )}
+            <ConfirmButton onConfirm={() => void changeStatus('cancelled')} busy={setStatus.isPending}>
+              {t('actions.cancel')}
+            </ConfirmButton>
+          </>
+        )}
+        {editable && booking.status === 'checked_in' && (
+          <ConfirmButton variant="default" onConfirm={() => void changeStatus('checked_out')} busy={setStatus.isPending}>
+            {t('actions.checkOut')}
+          </ConfirmButton>
+        )}
+        {editable && (
+          <Link to={`/bookings/${booking.id}/edit`} className={buttonVariants({ variant: 'outline' })}>
+            <Pencil className="h-4 w-4" aria-hidden />
+            {t('booking.edit')}
+          </Link>
+        )}
+        {folio && (
+          <Link to={`/bookings/${booking.id}/receipt`} className={buttonVariants({ variant: 'outline' })}>
+            <Printer className="h-4 w-4" aria-hidden />
+            {t('booking.receipt')}
+          </Link>
+        )}
+      </div>
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
 
       <div className="space-y-4 md:grid md:grid-cols-2 md:items-start md:gap-4 md:space-y-0">
         <div className="space-y-4">
           <Panel title={t('booking.guest')}>
             <Row label={t('booking.guest')} value={booking.guest?.name ?? '—'} />
-            <Row label="Phone" value={booking.guest?.phone ?? '—'} />
-            <Row label="Nationality" value={booking.guest?.nationality ?? '—'} />
+            <Row label={t('guests.phone')} value={booking.guest?.phone ?? '—'} />
+            <Row label={t('guests.nationality')} value={booking.guest?.nationality ?? '—'} />
+            {booking.guest && (
+              <Link
+                to={`/guests/${booking.guest.id}`}
+                className="mt-2 inline-flex items-center gap-1 text-sm text-muted-foreground underline"
+              >
+                <User className="h-4 w-4" aria-hidden />
+                {t('booking.viewGuest')}
+              </Link>
+            )}
           </Panel>
 
           <Panel title={t('booking.stay')}>
@@ -172,17 +214,7 @@ export function BookingDetailScreen() {
           {!folio || folio.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">—</p>
           ) : (
-            folio.items.map((item) => (
-              <Row
-                key={item.id}
-                label={
-                  item.kind === 'payment'
-                    ? `${methodLabel(item.method ?? 'cash')}${item.reference ? ` · ${item.reference}` : ''} · ${fmtInstantShort(item.postedAt)}`
-                    : item.description
-                }
-                value={item.kind === 'payment' ? `− ${formatPKR(item.amountPkr)}` : formatPKR(item.amountPkr)}
-              />
-            ))
+            folio.items.map((item) => <Row key={item.id} label={itemLabel(item)} value={itemValue(item)} />)
           )}
           <div className="my-2 border-t border-border" />
           <div className="flex items-baseline justify-between">
@@ -192,19 +224,42 @@ export function BookingDetailScreen() {
             </span>
           </div>
 
-          {canPost && folioMode === null && (
+          {canPost && !posting && (
             <div className="mt-3 flex gap-2">
-              <Button size="sm" onClick={() => setFolioMode('payment')}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setKind('payment')
+                  setPosting(true)
+                }}
+              >
                 {t('folio.addPayment')}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setFolioMode('charge')}>
-                {t('folio.addCharge')}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setKind('charge')
+                  setPosting(true)
+                }}
+              >
+                {t('folio.add')}
               </Button>
             </div>
           )}
 
-          {canPost && folioMode !== null && (
-            <form onSubmit={saveFolioItem} className="mt-3 space-y-3 border-t border-border pt-3">
+          {canPost && posting && (
+            <form onSubmit={saveItem} className="mt-3 space-y-3 border-t border-border pt-3">
+              <label className="block space-y-1 text-sm">
+                <span className="text-muted-foreground">{t('folio.kind')}</span>
+                <select className={inputClass} value={kind} onChange={(e) => setKind(e.target.value as FolioItemKind)}>
+                  {KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {kindLabel(k)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="block space-y-1 text-sm">
                 <span className="text-muted-foreground">{t('folio.amount')}</span>
                 <input
@@ -218,7 +273,7 @@ export function BookingDetailScreen() {
                   required
                 />
               </label>
-              {folioMode === 'payment' ? (
+              {needsMethod(kind) ? (
                 <>
                   <label className="block space-y-1 text-sm">
                     <span className="text-muted-foreground">{t('folio.method')}</span>
@@ -245,7 +300,7 @@ export function BookingDetailScreen() {
                 <Button type="submit" size="sm" disabled={addItem.isPending}>
                   {addItem.isPending ? t('actions.working') : t('folio.save')}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={resetFolioForm}>
+                <Button type="button" size="sm" variant="ghost" onClick={resetForm}>
                   {t('folio.cancel')}
                 </Button>
               </div>

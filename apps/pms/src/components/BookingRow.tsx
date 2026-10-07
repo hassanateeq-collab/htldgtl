@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
+import { formatPKR, t } from '@hotel-digital/shared'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
-import type { BookingVM } from '@/data/types'
+import { owesMoney, type BookingVM } from '@/data/types'
 import { fmtShort, nightsBetween } from '@/lib/dates'
 import { nightsLabel, sourceLabel } from '@/lib/labels'
 
 export function BookingRow({ booking }: { booking: BookingVM }) {
   const nights = nightsBetween(booking.checkIn, booking.checkOut)
+  const due = owesMoney(booking)
 
   return (
     <Link
@@ -28,6 +30,11 @@ export function BookingRow({ booking }: { booking: BookingVM }) {
         <div className="mt-1 flex flex-wrap gap-1">
           <StatusBadge status={booking.status} />
           <Badge className="border-border text-muted-foreground">{sourceLabel(booking.source)}</Badge>
+          {due && (
+            <Badge className="border-red-200 bg-red-50 text-red-700">
+              {t('bookings.due', { amount: formatPKR(booking.balance ?? 0) })}
+            </Badge>
+          )}
         </div>
       </div>
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

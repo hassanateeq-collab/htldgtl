@@ -4,7 +4,16 @@ import { useQuery } from '@tanstack/react-query'
 import { addDays, startOfDay } from 'date-fns'
 import type { BookingSource, BookingStatus, HousekeepingStatus, PaymentMethod } from '@hotel-digital/shared'
 import { supabase } from '@/lib/supabase'
-import type { BookingVM, FolioVM, PaymentVM, RoomTypeVM, RoomVM } from './types'
+import type {
+  BookingVM,
+  BrandingVM,
+  FolioItemKind,
+  FolioVM,
+  GuestRecordVM,
+  PaymentVM,
+  RoomTypeVM,
+  RoomVM,
+} from './types'
 
 export const keys = {
   roomTypes: (propertyId: string) => ['room-types', propertyId] as const,
@@ -12,6 +21,8 @@ export const keys = {
   bookings: (propertyId: string) => ['bookings', propertyId] as const,
   folio: (bookingId: string) => ['folio', bookingId] as const,
   todayPayments: (propertyId: string, day: string) => ['payments-today', propertyId, day] as const,
+  guests: () => ['guests'] as const,
+  branding: (tenantId: string) => ['branding', tenantId] as const,
 }
 
 // --- row shapes (subset of columns we select) ---
@@ -43,12 +54,25 @@ interface GuestRow {
   nationality: string | null
 }
 
+interface GuestRecordRow extends GuestRow {
+  cnic: string | null
+  passport: string | null
+  notes: string | null
+  created_at: string
+}
+
 interface BookingRoomRow {
   id: string
   room_id: string
   room_type_id: string
   nightly_rate_pkr: number | string
   room: { id: string; label: string; room_type: { id: string; name: string } | null } | null
+}
+
+interface FolioEmbedRow {
+  id: string
+  status: 'open' | 'closed'
+  balance: number | string
 }
 
 interface BookingRow {
@@ -62,11 +86,12 @@ interface BookingRow {
   notes: string | null
   guest: GuestRow | null
   rooms: BookingRoomRow[]
+  folio: FolioEmbedRow | FolioEmbedRow[] | null
 }
 
 interface FolioItemRow {
   id: string
-  kind: 'charge' | 'payment'
+  kind: FolioItemKind
   description: string
   amount_pkr: number | string
   method: PaymentMethod | null
@@ -89,15 +114,25 @@ interface PaymentRow {
   method: PaymentMethod
 }
 
+interface BrandingRow {
+  legal_name: string | null
+  address: string | null
+  ntn: string | null
+  strn: string | null
+  logo_url: string | null
+}
+
 const BOOKING_SELECT = `
   id, booking_no, status, source, check_in, check_out, adults, notes,
   guest:guests(id, name, phone, email, nationality),
   rooms:booking_rooms(id, room_id, room_type_id, nightly_rate_pkr,
-    room:rooms(id, label, room_type:room_types(id, name)))
+    room:rooms(id, label, room_type:room_types(id, name))),
+  folio:folios(id, status, balance)
 `
 
 function toBookingVM(row: BookingRow): BookingVM {
   const first = row.rooms[0]
+  const folio = Array.isArray(row.folio) ? (row.folio[0] ?? null) : row.folio
   return {
     id: row.id,
     bookingNo: row.booking_no,
@@ -113,6 +148,8 @@ function toBookingVM(row: BookingRow): BookingVM {
     roomTypeId: first?.room_type_id ?? null,
     roomTypeName: first?.room?.room_type?.name ?? null,
     nightlyRatePkr: first ? Number(first.nightly_rate_pkr) : 0,
+    balance: folio ? Number(folio.balance) : null,
+    folioStatus: folio?.status ?? null,
   }
 }
 
@@ -235,6 +272,56 @@ export function useTodayPayments(propertyId: string) {
         amountPkr: Number(p.amount_pkr),
         method: p.method,
       }))
+    },
+  })
+}
+
+/** All guests of the active tenant (RLS-scoped). */
+export function useGuests() {
+  return useQuery({
+    queryKey: keys.guests(),
+    queryFn: async (): Promise<GuestRecordVM[]> => {
+      const { data, error } = await supabase
+        .from('guests')
+        .select('id, name, phone, email, nationality, cnic, passport, notes, created_at')
+        .order('name')
+      if (error) throw error
+      return ((data ?? []) as GuestRecordRow[]).map((g) => ({
+        id: g.id,
+        name: g.name,
+        phone: g.phone,
+        email: g.email,
+        nationality: g.nationality,
+        cnic: g.cnic,
+        passport: g.passport,
+        notes: g.notes,
+        createdAt: g.created_at,
+      }))
+    },
+  })
+}
+
+/** Legal identity for receipts; null fields fall back to tenant/property names. */
+export function useBranding(tenantId: string) {
+  return useQuery({
+    queryKey: keys.branding(tenantId),
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<BrandingVM | null> => {
+      const { data, error } = await supabase
+        .from('tenant_branding')
+        .select('legal_name, address, ntn, strn, logo_url')
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+      if (error) throw error
+      if (!data) return null
+      const row = data as BrandingRow
+      return {
+        legalName: row.legal_name,
+        address: row.address,
+        ntn: row.ntn,
+        strn: row.strn,
+        logoUrl: row.logo_url,
+      }
     },
   })
 }

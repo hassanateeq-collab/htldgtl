@@ -4,10 +4,14 @@ import { AppShell } from '@/components/layout/AppShell'
 import { BookingDetailScreen } from '@/screens/BookingDetailScreen'
 import { BookingsScreen } from '@/screens/BookingsScreen'
 import { CalendarScreen } from '@/screens/CalendarScreen'
+import { EditBookingScreen } from '@/screens/EditBookingScreen'
+import { GuestDetailScreen } from '@/screens/GuestDetailScreen'
+import { GuestsScreen } from '@/screens/GuestsScreen'
 import { LoginEntryScreen } from '@/screens/LoginEntryScreen'
 import { LoginScreen } from '@/screens/LoginScreen'
 import { MoreScreen } from '@/screens/MoreScreen'
 import { NewBookingScreen } from '@/screens/NewBookingScreen'
+import { ReceiptScreen } from '@/screens/ReceiptScreen'
 import { RoomsScreen } from '@/screens/RoomsScreen'
 import { SelectTenantScreen } from '@/screens/SelectTenantScreen'
 import { TodayScreen } from '@/screens/TodayScreen'
@@ -28,10 +32,15 @@ export default function App() {
             <Route path="calendar" element={<CalendarScreen />} />
             <Route path="bookings" element={<BookingsScreen />} />
             <Route path="bookings/new" element={<NewBookingScreen />} />
+            <Route path="bookings/:id/edit" element={<EditBookingScreen />} />
             <Route path="bookings/:id" element={<BookingDetailScreen />} />
+            <Route path="guests" element={<GuestsScreen />} />
+            <Route path="guests/:id" element={<GuestDetailScreen />} />
             <Route path="rooms" element={<RoomsScreen />} />
             <Route path="more" element={<MoreScreen />} />
           </Route>
+          {/* Print view: no shell chrome, so the receipt is the whole page. */}
+          <Route path="bookings/:id/receipt" element={<ReceiptScreen />} />
         </Route>
       </Route>
 

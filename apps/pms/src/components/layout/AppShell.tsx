@@ -1,13 +1,30 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { BedDouble, CalendarDays, ClipboardList, Menu, Plus, Sun, type LucideIcon } from 'lucide-react'
+import { BedDouble, CalendarDays, ClipboardList, Menu, Plus, Sun, Users, type LucideIcon } from 'lucide-react'
 import { t, type MessageKey } from '@hotel-digital/shared'
 import { cn } from '@/lib/utils'
 import { useTenant } from '@/data/tenant'
 
-const tabs: { to: string; label: MessageKey; icon: LucideIcon }[] = [
+interface NavItem {
+  to: string
+  label: MessageKey
+  icon: LucideIcon
+}
+
+/** Mobile bottom tabs — five slots; Guests lives under More. */
+const tabs: NavItem[] = [
   { to: '/today', label: 'nav.today', icon: Sun },
   { to: '/calendar', label: 'nav.calendar', icon: CalendarDays },
   { to: '/bookings', label: 'nav.bookings', icon: ClipboardList },
+  { to: '/rooms', label: 'nav.rooms', icon: BedDouble },
+  { to: '/more', label: 'nav.more', icon: Menu },
+]
+
+/** Desktop sidebar — room for Guests as a first-class entry. */
+const sidebar: NavItem[] = [
+  { to: '/today', label: 'nav.today', icon: Sun },
+  { to: '/calendar', label: 'nav.calendar', icon: CalendarDays },
+  { to: '/bookings', label: 'nav.bookings', icon: ClipboardList },
+  { to: '/guests', label: 'nav.guests', icon: Users },
   { to: '/rooms', label: 'nav.rooms', icon: BedDouble },
   { to: '/more', label: 'nav.more', icon: Menu },
 ]
@@ -37,7 +54,7 @@ export function AppShell() {
         </div>
         <nav className="flex-1 px-2">
           <ul className="space-y-1">
-            {tabs.map(({ to, label, icon: Icon }) => (
+            {sidebar.map(({ to, label, icon: Icon }) => (
               <li key={to}>
                 <NavLink
                   to={to}
