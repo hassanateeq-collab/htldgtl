@@ -105,6 +105,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "booking_rooms_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "v_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "v_rooms_board"
+            referencedColumns: ["current_booking_id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "v_rooms_board"
+            referencedColumns: ["next_booking_id"]
+          },
+          {
             foreignKeyName: "booking_rooms_room_id_fkey"
             columns: ["room_id"]
             isOneToOne: false
@@ -112,10 +133,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "booking_rooms_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "v_rooms_board"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "booking_rooms_room_property_fkey"
             columns: ["property_id", "room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["property_id", "id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_room_property_fkey"
+            columns: ["property_id", "room_id"]
+            isOneToOne: false
+            referencedRelation: "v_rooms_board"
             referencedColumns: ["property_id", "id"]
           },
           {
@@ -228,6 +263,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bookings_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "v_guests"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bookings_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
@@ -239,6 +281,13 @@ export type Database = {
             columns: ["tenant_id", "guest_id"]
             isOneToOne: false
             referencedRelation: "guests"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_guest_fkey"
+            columns: ["tenant_id", "guest_id"]
+            isOneToOne: false
+            referencedRelation: "v_guests"
             referencedColumns: ["tenant_id", "id"]
           },
           {
@@ -453,7 +502,7 @@ export type Database = {
         Insert: {
           amount_pkr: number
           booking_room_id?: string | null
-          business_date: string
+          business_date?: string
           cash_shift_id?: string | null
           category?: string
           description: string
@@ -509,6 +558,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "folio_items_booking_room_id_fkey"
+            columns: ["booking_room_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings"
+            referencedColumns: ["booking_room_id"]
+          },
+          {
             foreignKeyName: "folio_items_cash_shift_id_fkey"
             columns: ["cash_shift_id"]
             isOneToOne: false
@@ -521,6 +577,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "folios"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folio_items_folio_id_fkey"
+            columns: ["folio_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings"
+            referencedColumns: ["folio_id"]
           },
           {
             foreignKeyName: "folio_items_reverses_item_id_fkey"
@@ -593,6 +656,27 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "bookings"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folios_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "v_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folios_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "v_rooms_board"
+            referencedColumns: ["current_booking_id"]
+          },
+          {
+            foreignKeyName: "folios_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "v_rooms_board"
+            referencedColumns: ["next_booking_id"]
           },
         ]
       }
@@ -714,10 +798,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "housekeeping_tasks_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "v_rooms_board"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "housekeeping_tasks_room_property_fkey"
             columns: ["property_id", "room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["property_id", "id"]
+          },
+          {
+            foreignKeyName: "housekeeping_tasks_room_property_fkey"
+            columns: ["property_id", "room_id"]
+            isOneToOne: false
+            referencedRelation: "v_rooms_board"
             referencedColumns: ["property_id", "id"]
           },
           {
@@ -1477,6 +1575,13 @@ export type Database = {
             referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "room_status_history_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "v_rooms_board"
+            referencedColumns: ["id"]
+          },
         ]
       }
       room_types: {
@@ -1889,7 +1994,217 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_bookings: {
+        Row: {
+          adults: number | null
+          balance: number | null
+          booking_no: string | null
+          booking_room_id: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          check_in: string | null
+          check_out: string | null
+          checked_in_at: string | null
+          checked_out_at: string | null
+          checkout_override_reason: string | null
+          children: number | null
+          created_at: string | null
+          folio_id: string | null
+          folio_no: string | null
+          folio_status: Database["public"]["Enums"]["folio_status"] | null
+          guest_has_id: boolean | null
+          guest_id: string | null
+          guest_name: string | null
+          guest_nationality: string | null
+          guest_phone: string | null
+          id: string | null
+          nightly_rate_pkr: number | null
+          nights: number | null
+          no_show_at: string | null
+          notes: string | null
+          property_id: string | null
+          room_hk_status:
+            | Database["public"]["Enums"]["housekeeping_status"]
+            | null
+          room_id: string | null
+          room_label: string | null
+          room_type_id: string | null
+          room_type_name: string | null
+          source: Database["public"]["Enums"]["booking_source"] | null
+          status: Database["public"]["Enums"]["booking_status"] | null
+          tenant_id: string | null
+          total_charges: number | null
+          total_payments: number | null
+          total_tax: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_rooms_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "v_rooms_board"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_room_type_id_fkey"
+            columns: ["room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "guests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "v_guests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_guest_fkey"
+            columns: ["tenant_id", "guest_id"]
+            isOneToOne: false
+            referencedRelation: "guests"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_guest_fkey"
+            columns: ["tenant_id", "guest_id"]
+            isOneToOne: false
+            referencedRelation: "v_guests"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_property_fkey"
+            columns: ["tenant_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["tenant_id", "id"]
+          },
+        ]
+      }
+      v_guests: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          custom_fields: Json | null
+          due: number | null
+          email: string | null
+          has_id: boolean | null
+          id: string | null
+          id_expiry: string | null
+          id_number: string | null
+          id_type: string | null
+          in_house: boolean | null
+          last_check_in: string | null
+          name: string | null
+          nationality: string | null
+          notes: string | null
+          phone: string | null
+          stays: number | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_rooms_board: {
+        Row: {
+          current_balance: number | null
+          current_booking_id: string | null
+          current_booking_no: string | null
+          current_check_in: string | null
+          current_check_out: string | null
+          current_guest_name: string | null
+          floor: number | null
+          housekeeping_status:
+            | Database["public"]["Enums"]["housekeeping_status"]
+            | null
+          id: string | null
+          is_active: boolean | null
+          label: string | null
+          next_booking_id: string | null
+          next_check_in: string | null
+          next_check_out: string | null
+          next_guest_name: string | null
+          property_id: string | null
+          room_type_id: string | null
+          room_type_name: string | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rooms_room_type_id_fkey"
+            columns: ["room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rooms_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rooms_tenant_property_fkey"
+            columns: ["tenant_id", "property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "rooms_type_property_fkey"
+            columns: ["property_id", "room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["property_id", "id"]
+          },
+        ]
+      }
     }
     Functions: {
       _assert_booking_writer: {
@@ -2034,6 +2349,16 @@ export type Database = {
       }
       tenant_access_level: { Args: never; Returns: string }
       tenant_has_feature: { Args: { p_key: string }; Returns: boolean }
+      tenant_members: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          membership_id: string
+          role: Database["public"]["Enums"]["tenant_role"]
+          user_id: string
+        }[]
+      }
       update_booking: {
         Args: {
           p_adults: number

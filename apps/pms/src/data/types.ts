@@ -1,13 +1,15 @@
-// View models the screens render. Hooks in ./queries.ts map database rows to
-// these; screens never touch raw rows.
+// View models the screens render. The hooks in ./bookings, ./folio, ./guests,
+// ./rooms map database rows (typed from the generated schema) to these; screens
+// never touch raw rows.
 import type {
   BookingSource,
   BookingStatus,
   HousekeepingStatus,
   PaymentMethod,
   SubscriptionStatus,
+  TenantRole,
 } from '@hotel-digital/shared'
-import type { DateStr } from '@/lib/dates'
+import type { DateStr } from '@/lib/clock'
 
 export interface TenantVM {
   id: string
@@ -15,13 +17,49 @@ export interface TenantVM {
   name: string
 }
 
+export type TaxMode = 'none' | 'exclusive' | 'inclusive'
+export type TaxApplies = 'room' | 'all'
+export type EarlyDeparturePolicy = 'release' | 'charge_full'
+
 export interface PropertyVM {
   id: string
   name: string
   city: string | null
   address: string | null
+  phone: string | null
+  email: string | null
   timezone: string
   currency: string
+  checkInTime: string
+  checkOutTime: string
+  taxName: string | null
+  taxRatePct: number
+  taxMode: TaxMode
+  taxAppliesTo: TaxApplies
+  ntn: string | null
+  strn: string | null
+  requireIdAtCheckIn: boolean
+  earlyDeparturePolicy: EarlyDeparturePolicy
+}
+
+export interface BrandingVM {
+  legalName: string | null
+  logoUrl: string | null
+  primaryColor: string | null
+}
+
+export interface ChargePreset {
+  label: string
+  amount: number
+  category: FolioCategory
+}
+
+export interface TenantSettingsVM {
+  bookingPrefix: string
+  receiptPrefix: string
+  folioPrefix: string
+  chargePresets: ChargePreset[]
+  receiptFooter: string | null
 }
 
 export interface AccessVM {
@@ -29,12 +67,11 @@ export interface AccessVM {
   accessLevel: 'full' | 'read_only' | 'none'
 }
 
-export interface BrandingVM {
-  legalName: string | null
-  address: string | null
-  ntn: string | null
-  strn: string | null
-  logoUrl: string | null
+export interface MembershipVM {
+  id: string
+  userId: string
+  role: TenantRole
+  email: string | null
 }
 
 export interface RoomTypeVM {
@@ -57,20 +94,42 @@ export interface RoomVM {
   isActive: boolean
 }
 
+export interface RoomBoardVM extends RoomVM {
+  roomTypeName: string
+  current: {
+    bookingId: string
+    bookingNo: string
+    guestName: string
+    checkIn: DateStr
+    checkOut: DateStr
+    balance: number
+  } | null
+  next: {
+    bookingId: string
+    guestName: string
+    checkIn: DateStr
+    checkOut: DateStr
+  } | null
+}
+
+export type IdType = 'cnic' | 'nicop' | 'poc' | 'passport' | 'other'
+
 export interface GuestVM {
   id: string
   name: string
   phone: string | null
   email: string | null
   nationality: string | null
-}
-
-/** Full guest record for the Guests screens. */
-export interface GuestRecordVM extends GuestVM {
-  cnic: string | null
-  passport: string | null
+  idType: IdType | null
+  idNumber: string | null
+  idExpiry: DateStr | null
+  address: string | null
   notes: string | null
-  createdAt: string
+  hasId: boolean
+  stays: number
+  lastCheckIn: DateStr | null
+  due: number
+  inHouse: boolean
 }
 
 export interface BookingVM {
@@ -80,61 +139,108 @@ export interface BookingVM {
   source: BookingSource
   checkIn: DateStr
   checkOut: DateStr
+  nights: number
   adults: number
+  children: number
   notes: string | null
-  guest: GuestVM | null
-  /** First assigned room (v1: one room per booking). */
-  roomId: string | null
-  roomLabel: string | null
-  roomTypeId: string | null
-  roomTypeName: string | null
+  createdAt: string
+  checkedInAt: string | null
+  checkedOutAt: string | null
+  cancelledAt: string | null
+  cancellationReason: string | null
+  noShowAt: string | null
+  checkoutOverrideReason: string | null
+  guest: {
+    id: string
+    name: string
+    phone: string | null
+    nationality: string | null
+    hasId: boolean
+  }
+  room: {
+    id: string
+    label: string
+    hkStatus: HousekeepingStatus
+    typeId: string
+    typeName: string
+  } | null
   nightlyRatePkr: number
-  /** Stored folio totals (null until the folio exists). */
-  balance: number | null
-  folioStatus: 'open' | 'closed' | null
+  folio: {
+    id: string
+    no: string | null
+    status: 'open' | 'closed'
+    charges: number
+    tax: number
+    payments: number
+    balance: number
+  } | null
 }
 
 export type FolioItemKind = 'charge' | 'payment' | 'discount' | 'refund'
+export type FolioCategory =
+  | 'room'
+  | 'food'
+  | 'laundry'
+  | 'minibar'
+  | 'extra'
+  | 'fee'
+  | 'adjustment'
+  | 'deposit'
+  | 'settlement'
+  | 'other'
 
 export interface FolioItemVM {
   id: string
   kind: FolioItemKind
+  category: FolioCategory
+  source: 'manual' | 'auto' | 'system'
   description: string
   amountPkr: number
+  taxPkr: number
   method: PaymentMethod | null
   reference: string | null
+  receiptNo: string | null
+  serviceDate: DateStr | null
+  businessDate: DateStr
   postedAt: string
+  postedBy: string | null
+  voidedAt: string | null
+  voidReason: string | null
 }
 
 export interface FolioVM {
   id: string
+  no: string | null
   status: 'open' | 'closed'
   totalCharges: number
+  totalTax: number
   totalPayments: number
   balance: number
   items: FolioItemVM[]
 }
 
-export interface PaymentVM {
+export interface CashShiftVM {
   id: string
-  amountPkr: number
-  method: PaymentMethod
+  shiftDate: DateStr
+  status: 'open' | 'handed_over' | 'confirmed'
+  openingFloat: number
+  openedBy: string | null
+  openedAt: string
+  declared: Partial<Record<PaymentMethod, number>>
+  expected: Partial<Record<PaymentMethod, number>> | null
+  confirmed: Partial<Record<PaymentMethod, number>> | null
+  discrepancy: Partial<Record<PaymentMethod, number>> | null
+  closedBy: string | null
+  closedAt: string | null
+  confirmedBy: string | null
+  confirmedAt: string | null
+  notes: string | null
 }
 
-/** Live bookings: arriving or in-house. */
-export const ACTIVE_STATUSES: ReadonlySet<BookingStatus> = new Set(['confirmed', 'checked_in'])
-/**
- * Statuses that block a room on the nights of their stay — mirrors the database's
- * no-double-book EXCLUDE predicate (everything except cancelled / no-show).
- * Early departures have their stay truncated to the actual check-out, so a
- * checked-out booking never blocks future nights.
- */
-export const OCCUPYING_STATUSES: ReadonlySet<BookingStatus> = new Set([
-  'confirmed',
-  'checked_in',
-  'checked_out',
-])
+/** Statuses that block a room on the nights of their stay (mirrors the EXCLUDE predicate). */
+export const OCCUPYING_STATUSES: ReadonlySet<BookingStatus> = new Set(['confirmed', 'checked_in', 'checked_out'])
 
-/** A booking owes money when its folio balance is positive and the stay is real. */
-export const owesMoney = (b: BookingVM) =>
-  (b.balance ?? 0) > 0 && b.status !== 'cancelled' && b.status !== 'no_show'
+export const isLive = (b: Pick<BookingVM, 'status'>) => b.status === 'confirmed' || b.status === 'checked_in'
+export const owesMoney = (b: Pick<BookingVM, 'folio' | 'status'>) =>
+  (b.folio?.balance ?? 0) > 0 && b.status !== 'cancelled' && b.status !== 'no_show'
+export const hasCredit = (b: Pick<BookingVM, 'folio'>) => (b.folio?.balance ?? 0) < 0

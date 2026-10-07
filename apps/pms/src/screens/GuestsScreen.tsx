@@ -1,103 +1,83 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
-import { formatPKR, t } from '@hotel-digital/shared'
+import { ChevronRight, Search, X } from 'lucide-react'
+import { formatPhone, formatPKR, t } from '@hotel-digital/shared'
 import { Badge } from '@/components/ui/badge'
-import { ErrorNote, Loading } from '@/components/State'
-import { useTenant } from '@/data/tenant'
-import { useBookings, useGuests } from '@/data/queries'
-import { owesMoney } from '@/data/types'
-import { fmtShort } from '@/lib/dates'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { EmptyState, SkeletonRows } from '@/components/ui/feedback'
+import { Page, PageHeader } from '@/components/patterns/Page'
+import { QueryState } from '@/components/patterns/state'
+import { useHotelToday } from '@/data/tenant'
+import { useGuestsList } from '@/data/guests'
+import { fmtSmart } from '@/lib/clock'
+import { useDebounced } from '@/lib/useDebounced'
+import { cn } from '@/lib/utils'
 
-const inputClass =
-  'h-11 w-full rounded-md border border-input bg-background px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-
-interface GuestStats {
-  stays: number
-  lastCheckIn: string | null
-  due: number
-}
-
-export function GuestsScreen() {
-  const { property } = useTenant()
-  const guestsQ = useGuests()
-  const bookingsQ = useBookings(property.id)
+export default function GuestsScreen() {
+  const today = useHotelToday()
   const [q, setQ] = useState('')
-
-  const stats = useMemo(() => {
-    const map = new Map<string, GuestStats>()
-    for (const b of bookingsQ.data ?? []) {
-      if (!b.guest) continue
-      const s = map.get(b.guest.id) ?? { stays: 0, lastCheckIn: null, due: 0 }
-      if (b.status !== 'cancelled' && b.status !== 'no_show') {
-        s.stays += 1
-        if (!s.lastCheckIn || b.checkIn > s.lastCheckIn) s.lastCheckIn = b.checkIn
-      }
-      if (owesMoney(b)) s.due += b.balance ?? 0
-      map.set(b.guest.id, s)
-    }
-    return map
-  }, [bookingsQ.data])
-
-  if (guestsQ.isPending || bookingsQ.isPending) return <Loading />
-  const error = guestsQ.error ?? bookingsQ.error
-  if (error) return <ErrorNote message={error.message} />
-
-  const term = q.trim().toLowerCase()
-  // Phones are stored as +92…; a local "0321…" search must still match, so drop the trunk zero.
-  const digits = term.replace(/\D/g, '').replace(/^0/, '')
-  const guests = (guestsQ.data ?? []).filter((g) => {
-    if (!term) return true
-    if (g.name.toLowerCase().includes(term)) return true
-    if (digits.length >= 3 && g.phone && g.phone.replace(/\D/g, '').includes(digits)) return true
-    return false
-  })
+  const deferred = useDebounced(q.trim(), 250)
+  const listQ = useGuestsList(deferred)
+  const guests = listQ.data ?? []
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-4 px-4 py-4 pb-24 md:max-w-5xl md:px-6 md:py-6 md:pb-8">
-      <input
-        className={inputClass}
-        placeholder={t('guests.search')}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        autoComplete="off"
-      />
+    <Page width="lg">
+      <PageHeader title={t('guests.title')} />
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+        <Input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={t('guests.search')}
+          aria-label={t('guests.search')}
+          className="pl-10 pr-10 [&::-webkit-search-cancel-button]:hidden"
+          enterKeyHint="search"
+          autoComplete="off"
+        />
+        {q && (
+          <Button variant="ghost" size="icon-sm" className="absolute right-1 top-1/2 -translate-y-1/2" aria-label={t('common.clear')} onClick={() => setQ('')}>
+            <X className="h-5 w-5" aria-hidden />
+          </Button>
+        )}
+      </div>
 
-      {guests.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border p-3 text-center text-sm text-muted-foreground">
-          {t('guests.empty')}
-        </p>
-      ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card text-card-foreground md:grid md:grid-cols-2 md:divide-y-0 md:gap-px md:bg-border">
-          {guests.map((g) => {
-            const s = stats.get(g.id)
-            return (
-              <li key={g.id} className="bg-card">
-                <Link to={`/guests/${g.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-accent">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{g.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[
-                        g.phone,
-                        s ? (s.stays === 1 ? t('guests.stay') : t('guests.stays', { n: s.stays })) : null,
-                        s?.lastCheckIn ? t('guests.lastStay', { date: fmtShort(s.lastCheckIn) }) : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                  </div>
-                  {s && s.due > 0 && (
-                    <Badge className="border-red-200 bg-red-50 text-red-700">
-                      {t('bookings.due', { amount: formatPKR(s.due) })}
-                    </Badge>
-                  )}
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </div>
+      <QueryState pending={listQ.isPending} error={listQ.error} onRetry={() => void listQ.refetch()} skeleton={<SkeletonRows rows={6} />}>
+        {guests.length === 0 ? (
+          <EmptyState title={deferred ? t('guests.emptySearch', { q: deferred }) : t('guests.empty')} />
+        ) : (
+          <Card className={cn('transition-opacity', listQ.isPlaceholderData && 'opacity-60')} aria-busy={listQ.isPlaceholderData}>
+            <ul className="divide-y divide-border md:grid md:grid-cols-2 md:divide-y-0 md:gap-px md:bg-border">
+              {guests.map((g) => (
+                <li key={g.id} className="bg-card">
+                  <Link to={`/guests/${g.id}`} className="flex min-h-touch items-center gap-3 px-4 py-3 hover:bg-accent/60 active:bg-accent">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 truncate text-base font-medium">{g.name}</p>
+                        {g.inHouse && <Badge tone="inhouse" className="shrink-0">{t('guests.inHouse')}</Badge>}
+                      </div>
+                      <p className="tnum truncate text-sm text-muted-foreground">
+                        {[formatPhone(g.phone), g.stays === 0 ? t('guests.noStays') : g.stays === 1 ? t('guests.stay') : t('guests.stays', { n: g.stays }), g.lastCheckIn ? t('guests.lastStay', { date: fmtSmart(g.lastCheckIn, today) }) : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                      {(g.due > 0 || !g.hasId) && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {g.due > 0 && <Badge tone="due">{t('bookings.due', { amount: formatPKR(g.due) })}</Badge>}
+                          {!g.hasId && <Badge tone="warning">{t('guests.noId')}</Badge>}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryState>
+    </Page>
   )
 }

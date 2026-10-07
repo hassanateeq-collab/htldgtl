@@ -3,6 +3,8 @@
 
 export * from './format'
 export * from './i18n'
+export * from './permissions'
+export * from './errors'
 export type { Database, Json } from './database.types'
 
 // --- Feature keys (mirrored by a DB check constraint on platform_features.key) ---

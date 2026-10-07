@@ -29,3 +29,7 @@ The first front-desk release let any front-desk login edit or delete payment row
 - **Correcting rows in place with audit-log reconstruction** — the audit log is readable only by owner/manager/accounts and is not what the receipt shows; voids are the industry norm.
 - **A separate `taxes` line table** — pairing tax rows with their charge complicates voids; a `tax_pkr` column on the item keeps one row per economic event.
 - **Keeping the rules only in the RPCs** — direct PostgREST writes would still bypass them.
+
+## Addendum 2026-10-08 — minimum one night
+
+Rule 2 released *every* night from today on an early departure, so a guest who checked in and left on the same hotel day paid nothing for the room. From migration 19 (`20261008003000_minimum_one_night.sql`) early departure releases unstayed nights only from `greatest(today, check_in + 1)`: the stay always keeps its first night and `check_out` never collapses onto `check_in`. Day-use pricing, if ever wanted, becomes a separate rate, not a zero bill. The app's check-out sheet mirrors the same rule in its projected balance.

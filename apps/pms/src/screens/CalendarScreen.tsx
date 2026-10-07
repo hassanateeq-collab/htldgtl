@@ -1,230 +1,265 @@
-import { useState, type MouseEvent } from 'react'
+import { useMemo, useState, type MouseEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatPKR, t, type BookingStatus } from '@hotel-digital/shared'
 import { Button } from '@/components/ui/button'
-import { ErrorNote, Loading } from '@/components/State'
-import { useTenant } from '@/data/tenant'
-import { useBookings, useRooms, useRoomTypes } from '@/data/queries'
-import { OCCUPYING_STATUSES, owesMoney, type BookingVM, type RoomVM } from '@/data/types'
-import { addDaysStr, daysBetween, fmtDay, fmtDayNum, fmtShort, isNightCovered, todayStr, type DateStr } from '@/lib/dates'
+import { Sheet } from '@/components/ui/sheet'
+import { Skeleton } from '@/components/ui/feedback'
+import { Page, PageHeader, SectionTitle } from '@/components/patterns/Page'
+import { BookingRow, HkBadge } from '@/components/patterns/display'
+import { QueryState } from '@/components/patterns/state'
+import { useHotelToday, useTenant } from '@/data/tenant'
+import { useBookingsInRange } from '@/data/bookings'
+import { useRooms, useRoomTypes } from '@/data/rooms'
+import { OCCUPYING_STATUSES, type BookingVM, type RoomVM } from '@/data/types'
+import { addDaysStr, daysBetween, fmtDay, fmtDayNum, fmtMedium, fmtShort, isDateStr, isNightCovered, type DateStr } from '@/lib/clock'
 import { statusLabel } from '@/lib/labels'
 import { useIsDesktop } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 
-// Tape chart geometry. Bars start and end mid-cell so a same-day
+// Tape-chart geometry. Bars start and end mid-cell so a same-day
 // check-out / check-in in one room never visually overlaps.
-const COL_W = 56
-const LABEL_W = 60
-const ROW_H = 44
-const WRITER_ROLES = ['owner', 'manager', 'front_desk']
+const COL_W = 60
+const LABEL_W = 76
+const ROW_H = 48
 
 type DrawnStatus = Exclude<BookingStatus, 'cancelled'>
-const barStyles: Record<DrawnStatus, string> = {
-  confirmed: 'bg-blue-500 text-white',
-  checked_in: 'bg-green-600 text-white',
-  checked_out: 'bg-zinc-300 text-zinc-700',
-  no_show: 'bg-red-400 text-white',
+const barClass: Record<DrawnStatus, string> = {
+  confirmed: 'bg-status-confirmed text-white',
+  checked_in: 'bg-status-inhouse text-white',
+  checked_out: 'bg-status-departed text-status-departed-fg',
+  no_show: 'striped bg-status-noshow-bg text-status-noshow-fg',
 }
 
-export function CalendarScreen() {
+export default function CalendarScreen() {
   const navigate = useNavigate()
-  const { property, role, access } = useTenant()
-  const roomTypesQ = useRoomTypes(property.id)
-  const roomsQ = useRooms(property.id)
-  const bookingsQ = useBookings(property.id)
+  const { can } = useTenant()
+  const today = useHotelToday()
   const desktop = useIsDesktop()
-  const today = todayStr()
-  const [start, setStart] = useState<DateStr>(addDaysStr(today, -2))
-
-  if (roomTypesQ.isPending || roomsQ.isPending || bookingsQ.isPending) return <Loading />
-  const error = roomTypesQ.error ?? roomsQ.error ?? bookingsQ.error
-  if (error) {
-    return (
-      <ErrorNote
-        message={error.message}
-        onRetry={() => {
-          void roomTypesQ.refetch()
-          void roomsQ.refetch()
-          void bookingsQ.refetch()
-        }}
-      />
-    )
-  }
-
-  const roomTypes = roomTypesQ.data ?? []
-  const rooms = roomsQ.data ?? []
-  const bookings = bookingsQ.data ?? []
   const days = desktop ? 28 : 14
+  const lead = desktop ? 2 : 1
+  const [start, setStart] = useState<DateStr>(() => addDaysStr(today, -lead))
+  const [showNoShows, setShowNoShows] = useState(false)
+  const [dayOpen, setDayOpen] = useState<DateStr | null>(null)
+
+  const end = addDaysStr(start, days)
+  const roomTypesQ = useRoomTypes()
+  const roomsQ = useRooms()
+  const bookingsQ = useBookingsInRange(start, end)
+
+  const dates = useMemo(() => Array.from({ length: days }, (_, i) => addDaysStr(start, i)), [start, days])
+  const rooms = useMemo(() => (roomsQ.data ?? []).filter((r) => r.isActive), [roomsQ.data])
+  const roomTypes = roomTypesQ.data ?? []
+  const bookings = useMemo(() => (bookingsQ.data ?? []).filter((b) => showNoShows || b.status !== 'no_show'), [bookingsQ.data, showNoShows])
+  const byRoom = useMemo(() => {
+    const m = new Map<string, BookingVM[]>()
+    for (const b of bookings) if (b.room) m.set(b.room.id, [...(m.get(b.room.id) ?? []), b])
+    return m
+  }, [bookings])
+  const occupiedOn = useMemo(() => {
+    const m = new Map<DateStr, number>()
+    for (const d of dates) m.set(d, bookings.filter((b) => OCCUPYING_STATUSES.has(b.status) && isNightCovered(b.checkIn, b.checkOut, d)).length)
+    return m
+  }, [bookings, dates])
+
   const gridW = days * COL_W
-  const dates: DateStr[] = Array.from({ length: days }, (_, i) => addDaysStr(start, i))
   const todayIdx = daysBetween(start, today)
-  const totalRooms = rooms.length
-  const canWrite = access?.accessLevel === 'full' && !!role && WRITER_ROLES.includes(role)
+  const canWrite = can('bookings.create')
+  const sellable = rooms.filter((r) => r.housekeepingStatus !== 'out_of_order').length
 
-  const occupiedOn = (night: DateStr) =>
-    bookings.filter((b) => OCCUPYING_STATUSES.has(b.status) && isNightCovered(b.checkIn, b.checkOut, night)).length
-
-  // Tap on an empty cell starts a booking for that room and night.
   function onRowClick(e: MouseEvent<HTMLDivElement>, room: RoomVM) {
-    if (!canWrite) return
+    if (!canWrite || room.housekeepingStatus === 'out_of_order') return
     if ((e.target as HTMLElement).closest('a')) return
     const rect = e.currentTarget.getBoundingClientRect()
     const idx = Math.floor((e.clientX - rect.left) / COL_W)
     const date = dates[idx]
-    if (!date) return
+    if (!date || date < today) return
     navigate(`/bookings/new?room=${room.id}&checkIn=${date}`)
   }
 
+  const dayBookings = dayOpen ? bookings.filter((b) => b.checkIn === dayOpen || b.checkOut === dayOpen) : []
+
   return (
-    <div className="flex h-[calc(100svh-7rem)] flex-col md:h-svh">
-      {/* Navigation */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <Button size="sm" variant="outline" aria-label={t('cal.prev')} onClick={() => setStart(addDaysStr(start, -7))}>
-          <ChevronLeft className="h-4 w-4" aria-hidden />
+    <Page width="full" className="flex h-[calc(100svh-var(--topbar-h)-var(--tabbar-h))] flex-col !space-y-3 !px-0 !pb-0 md:h-svh md:!px-0 md:!py-4">
+      <div className="px-4 md:px-6">
+        <PageHeader title={t('cal.title')} subtitle={`${fmtShort(dates[0]!)} – ${fmtShort(dates[dates.length - 1]!)}`} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6">
+        <Button variant="outline" size="icon" aria-label={t('cal.prev')} onClick={() => setStart(addDaysStr(start, -7))}>
+          <ChevronLeft className="h-5 w-5" aria-hidden />
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setStart(addDaysStr(today, -2))}>
+        <Button variant="outline" onClick={() => setStart(addDaysStr(today, -lead))}>
           {t('cal.today')}
         </Button>
-        <Button size="sm" variant="outline" aria-label={t('cal.next')} onClick={() => setStart(addDaysStr(start, 7))}>
-          <ChevronRight className="h-4 w-4" aria-hidden />
+        <Button variant="outline" size="icon" aria-label={t('cal.next')} onClick={() => setStart(addDaysStr(start, 7))}>
+          <ChevronRight className="h-5 w-5" aria-hidden />
         </Button>
         <input
           type="date"
           aria-label={t('cal.jump')}
-          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-          value={start}
-          onChange={(e) => e.target.value && setStart(e.target.value)}
+          className="h-touch rounded-md border border-input bg-card px-3 text-base"
+          value={addDaysStr(start, lead)}
+          onChange={(e) => isDateStr(e.target.value) && setStart(addDaysStr(e.target.value, -lead))}
         />
-        <span className="ml-auto hidden text-xs text-muted-foreground md:inline">
-          {fmtShort(dates[0]!)} – {fmtShort(dates[dates.length - 1]!)}
-          {canWrite ? ` · ${t('cal.hint')}` : ''}
-        </span>
+        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setShowNoShows((v) => !v)}>
+          {showNoShows ? t('cal.hideNoShows') : t('cal.showNoShows')}
+        </Button>
+        {canWrite && <span className="hidden text-xs text-muted-foreground lg:inline">{t('cal.hint')}</span>}
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <div style={{ width: LABEL_W + gridW }}>
-          {/* Date header */}
-          <div className="sticky top-0 z-20 flex bg-background">
-            <div
-              className="sticky left-0 z-30 shrink-0 border-b border-r border-border bg-background"
-              style={{ width: LABEL_W }}
-            />
-            {dates.map((ds) => (
-              <div
-                key={ds}
-                className={cn(
-                  'shrink-0 border-b border-l border-border py-1 text-center',
-                  ds === today && 'bg-accent',
-                )}
-                style={{ width: COL_W }}
-              >
-                <div className="text-[10px] uppercase text-muted-foreground">{fmtDay(ds)}</div>
-                <div className="text-sm font-semibold leading-tight">{fmtDayNum(ds)}</div>
-                <div className="text-[10px] text-muted-foreground">
-                  {occupiedOn(ds)}/{totalRooms}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Rooms grouped by type */}
-          {roomTypes.map((rt) => (
-            <div key={rt.id}>
-              <div className="flex">
-                <div
-                  className="sticky left-0 z-10 shrink-0 border-r border-border bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground"
-                  style={{ width: LABEL_W }}
+      <QueryState
+        pending={roomTypesQ.isPending || roomsQ.isPending || bookingsQ.isPending}
+        error={roomTypesQ.error ?? roomsQ.error ?? bookingsQ.error}
+        onRetry={() => void bookingsQ.refetch()}
+        skeleton={<Skeleton className="mx-4 h-96 md:mx-6" />}
+      >
+        <div className="min-h-0 flex-1 overflow-auto border-t border-border">
+          <div style={{ width: LABEL_W + gridW }}>
+            {/* date header */}
+            <div className="sticky top-0 z-20 flex bg-background">
+              <div className="sticky left-0 z-30 shrink-0 border-b border-r border-border bg-background" style={{ width: LABEL_W }} />
+              {dates.map((d) => (
+                <button
+                  type="button"
+                  key={d}
+                  onClick={() => setDayOpen(d)}
+                  className={cn('shrink-0 border-b border-l border-border py-1.5 text-center hover:bg-accent', d === today && 'bg-accent')}
+                  style={{ width: COL_W }}
+                  aria-label={fmtMedium(d)}
                 >
-                  {rt.name}
-                </div>
-                <div className="bg-muted/60" style={{ width: gridW, height: 24 }} />
-              </div>
+                  <div className="text-[11px] uppercase text-muted-foreground">{fmtDay(d)}</div>
+                  <div className={cn('tnum text-base font-semibold leading-tight', d === today && 'text-primary')}>{fmtDayNum(d)}</div>
+                  <div className="tnum text-[11px] text-muted-foreground">
+                    {occupiedOn.get(d)}/{sellable}
+                  </div>
+                </button>
+              ))}
+            </div>
 
-              {rooms
-                .filter((room) => room.roomTypeId === rt.id)
-                .map((room) => (
-                  <div key={room.id} className="flex" style={{ height: ROW_H }}>
-                    <div
-                      className="sticky left-0 z-10 flex shrink-0 items-center border-b border-r border-border bg-background px-2 text-sm font-medium"
-                      style={{ width: LABEL_W }}
-                    >
-                      {room.label}
+            {roomTypes.map((rt) => {
+              const typeRooms = rooms.filter((r) => r.roomTypeId === rt.id)
+              if (typeRooms.length === 0) return null
+              return (
+                <div key={rt.id}>
+                  <div className="flex">
+                    <div className="sticky left-0 z-10 shrink-0 border-r border-border bg-muted px-2 py-1 text-xs font-medium text-muted-foreground" style={{ width: LABEL_W }}>
+                      {rt.name}
                     </div>
-                    <div
-                      className={cn('relative border-b border-border', canWrite && 'cursor-pointer')}
-                      style={{
-                        width: gridW,
-                        backgroundImage: `repeating-linear-gradient(to right, transparent 0 ${COL_W - 1}px, var(--border) ${COL_W - 1}px ${COL_W}px)`,
-                      }}
-                      onClick={(e) => onRowClick(e, room)}
-                    >
-                      {todayIdx >= 0 && todayIdx < days && (
-                        <div
-                          className="pointer-events-none absolute inset-y-0 bg-accent/50"
-                          style={{ left: todayIdx * COL_W, width: COL_W }}
+                    <div className="bg-muted/60" style={{ width: gridW, height: 26 }} />
+                  </div>
+                  {typeRooms.map((room) => (
+                    <div key={room.id} className="flex" style={{ height: ROW_H }}>
+                      <div
+                        className={cn('sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-b border-r border-border bg-background px-2', room.housekeepingStatus === 'out_of_order' && 'striped text-hk-ooo')}
+                        style={{ width: LABEL_W }}
+                        title={room.housekeepingStatus}
+                      >
+                        <span
+                          className={cn(
+                            'h-2.5 w-2.5 shrink-0 rounded-full',
+                            room.housekeepingStatus === 'clean' && 'bg-hk-clean',
+                            room.housekeepingStatus === 'inspected' && 'bg-hk-inspected',
+                            room.housekeepingStatus === 'dirty' && 'bg-hk-dirty',
+                            room.housekeepingStatus === 'out_of_order' && 'bg-hk-ooo',
+                          )}
+                          aria-hidden
                         />
-                      )}
-                      {bookings
-                        .filter((b) => b.roomId === room.id && b.status !== 'cancelled')
-                        .map((b) => (
+                        <span className="tnum text-base font-medium">{room.label}</span>
+                      </div>
+                      <div
+                        className={cn('relative border-b border-border', canWrite && room.housekeepingStatus !== 'out_of_order' && 'cursor-pointer')}
+                        style={{
+                          width: gridW,
+                          backgroundImage: `repeating-linear-gradient(to right, transparent 0 ${COL_W - 1}px, var(--border) ${COL_W - 1}px ${COL_W}px)`,
+                        }}
+                        onClick={(e) => onRowClick(e, room)}
+                      >
+                        {todayIdx >= 0 && todayIdx < days && <div className="pointer-events-none absolute inset-y-0 bg-accent/60" style={{ left: todayIdx * COL_W, width: COL_W }} />}
+                        {(byRoom.get(room.id) ?? []).map((b) => (
                           <Bar key={b.id} booking={b} start={start} gridW={gridW} />
                         ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
-          ))}
+                  ))}
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      </QueryState>
+
       <Legend />
-    </div>
+
+      {dayOpen && (
+        <Sheet open onOpenChange={(o) => !o && setDayOpen(null)} title={fmtMedium(dayOpen)} size="lg">
+          <div className="space-y-4">
+            <section className="space-y-2">
+              <SectionTitle count={dayBookings.filter((b) => b.checkIn === dayOpen).length}>{t('today.arrivals')}</SectionTitle>
+              {dayBookings
+                .filter((b) => b.checkIn === dayOpen)
+                .map((b) => (
+                  <BookingRow key={b.id} booking={b} today={today} />
+                ))}
+            </section>
+            <section className="space-y-2">
+              <SectionTitle count={dayBookings.filter((b) => b.checkOut === dayOpen).length}>{t('today.departures')}</SectionTitle>
+              {dayBookings
+                .filter((b) => b.checkOut === dayOpen)
+                .map((b) => (
+                  <BookingRow key={b.id} booking={b} today={today} />
+                ))}
+            </section>
+          </div>
+        </Sheet>
+      )}
+    </Page>
   )
 }
 
-function Bar({ booking, start, gridW }: { booking: BookingVM; start: DateStr; gridW: number }) {
-  const status = booking.status
-  if (status === 'cancelled') return null
-
-  const x0 = daysBetween(start, booking.checkIn) * COL_W + COL_W / 2
-  const x1 = daysBetween(start, booking.checkOut) * COL_W + COL_W / 2
+function Bar({ booking: b, start, gridW }: { booking: BookingVM; start: DateStr; gridW: number }) {
+  if (b.status === 'cancelled') return null
+  const x0 = daysBetween(start, b.checkIn) * COL_W + COL_W / 2
+  const x1 = daysBetween(start, b.checkOut) * COL_W + COL_W / 2
   const left = Math.max(0, x0)
   const right = Math.min(gridW, x1)
   const width = right - left - 4
   if (width <= 8) return null
-
-  const name = booking.guest?.name ?? booking.bookingNo
-  const due = owesMoney(booking)
-  const title = `${name} · ${statusLabel(status)}${due ? ` · ${t('bookings.due', { amount: formatPKR(booking.balance ?? 0) })}` : ''}`
+  const due = (b.folio?.balance ?? 0) > 0 && b.status !== 'no_show'
+  const title = `${b.guest.name} · ${statusLabel(b.status)}${due ? ` · ${t('bookings.due', { amount: formatPKR(b.folio!.balance) })}` : ''}`
   return (
     <Link
-      to={`/bookings/${booking.id}`}
+      to={`/bookings/${b.id}`}
       title={title}
-      className={cn(
-        'absolute inset-y-1.5 flex items-center gap-1 truncate rounded-md px-2 text-xs font-medium shadow-sm',
-        barStyles[status],
-      )}
+      aria-label={title}
+      className={cn('absolute inset-y-1 flex items-center gap-1 truncate rounded-md px-2 text-xs font-medium shadow-sm', barClass[b.status as DrawnStatus])}
       style={{ left: left + 2, width }}
     >
-      <span className="truncate">{name.split(' ')[0]}</span>
-      {due && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-200 ring-1 ring-red-500" aria-hidden />}
+      <span className="truncate">{b.guest.name.split(' ')[0]}</span>
+      {due && <span className="h-2 w-2 shrink-0 rounded-full bg-white ring-2 ring-due" aria-hidden />}
     </Link>
   )
 }
 
 function Legend() {
+  const items: { cls: string; label: string }[] = [
+    { cls: 'bg-status-confirmed', label: statusLabel('confirmed') },
+    { cls: 'bg-status-inhouse', label: statusLabel('checked_in') },
+    { cls: 'bg-status-departed', label: statusLabel('checked_out') },
+    { cls: 'striped bg-status-noshow-bg text-status-noshow-fg', label: statusLabel('no_show') },
+  ]
   return (
-    // Right padding on mobile keeps the legend clear of the floating "+" button.
-    <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border py-2 pl-4 pr-20 text-[11px] text-muted-foreground md:pr-4">
-      {(Object.keys(barStyles) as DrawnStatus[]).map((s) => (
-        <span key={s} className="inline-flex items-center gap-1.5">
-          <span className={cn('h-2.5 w-2.5 rounded-sm', barStyles[s].split(' ')[0])} />
-          {statusLabel(s)}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-4 py-2 pr-20 text-xs text-muted-foreground md:px-6 md:pr-6">
+      {items.map((i) => (
+        <span key={i.label} className="inline-flex items-center gap-1.5">
+          <span className={cn('h-3 w-3 rounded-sm', i.cls)} aria-hidden /> {i.label}
         </span>
       ))}
       <span className="inline-flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-red-200 ring-1 ring-red-500" />
-        {t('bookings.outstanding')}
+        <span className="h-2 w-2 rounded-full bg-white ring-2 ring-due" aria-hidden /> {t('cal.legendDue')}
+      </span>
+      <span className="ml-auto hidden items-center gap-2 md:inline-flex">
+        <HkBadge status="clean" /> <HkBadge status="dirty" /> <HkBadge status="out_of_order" />
       </span>
     </div>
   )

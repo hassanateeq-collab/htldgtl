@@ -1,73 +1,74 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { BarChart3, ChevronRight, Settings, Sparkles, Users, Wallet, type LucideIcon } from 'lucide-react'
-import { t, type MessageKey } from '@hotel-digital/shared'
+import { BarChart3, ChevronRight, LogOut, MessageCircle, Settings, Sparkles, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { t, type Ability, type MessageKey } from '@hotel-digital/shared'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Page, PageHeader } from '@/components/patterns/Page'
 import { useSession } from '@/auth/session'
 import { useTenant } from '@/data/tenant'
+import { roleLabel } from '@/lib/labels'
 
-const items: { key: MessageKey; icon: LucideIcon; to?: string }[] = [
-  { key: 'more.guests', icon: Users, to: '/guests' },
-  { key: 'more.housekeeping', icon: Sparkles },
-  { key: 'more.reports', icon: BarChart3 },
-  { key: 'more.cashHandover', icon: Wallet },
-  { key: 'more.settings', icon: Settings },
+const ITEMS: { key: MessageKey; icon: LucideIcon; to: string; ability?: Ability }[] = [
+  { key: 'nav.guests', icon: Users, to: '/guests' },
+  { key: 'nav.housekeeping', icon: Sparkles, to: '/housekeeping' },
+  { key: 'nav.cash', icon: Wallet, to: '/cash' },
+  { key: 'nav.reports', icon: BarChart3, to: '/reports/daily', ability: 'reports.view' },
+  { key: 'nav.settings', icon: Settings, to: '/settings', ability: 'settings.manage' },
 ]
 
-export function MoreScreen() {
+const SUPPORT_URL = 'https://wa.me/?text=Hotel%20Digital%20support'
+
+export default function MoreScreen() {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const { session, signOut } = useSession()
-  const { role } = useTenant()
+  const { tenant, property, role, can } = useTenant()
 
   async function onSignOut() {
     await signOut()
-    queryClient.clear()
     navigate('/login', { replace: true })
   }
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-4 px-4 py-4 pb-24 md:max-w-3xl md:px-6 md:py-6 md:pb-8">
-      <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
-        {items.map(({ key, icon: Icon, to }) => {
-          const inner = (
-            <>
-              <Icon className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <div className="flex-1">
-                <p className="text-sm font-medium">{t(key)}</p>
-                {!to && <p className="text-xs text-muted-foreground">{t('more.comingSoon')}</p>}
-              </div>
-              {to && <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />}
-            </>
-          )
-          return (
+    <Page width="md">
+      <PageHeader title={t('more.title')} subtitle={property.name} />
+      <Card>
+        <ul className="divide-y divide-border">
+          {ITEMS.filter((i) => !i.ability || can(i.ability)).map(({ key, icon: Icon, to }) => (
             <li key={key}>
-              {to ? (
-                <Link to={to} className="flex items-center gap-3 px-4 py-3 active:bg-accent">
-                  {inner}
-                </Link>
-              ) : (
-                <div className="flex items-center gap-3 px-4 py-3">{inner}</div>
-              )}
+              <Link to={to} className="flex min-h-touch items-center gap-3 px-4 py-3 hover:bg-accent/60 active:bg-accent">
+                <Icon className="h-5 w-5 text-muted-foreground" aria-hidden />
+                <span className="flex-1 text-base font-medium">{t(key)}</span>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" aria-hidden />
+              </Link>
             </li>
-          )
-        })}
-      </ul>
+          ))}
+          <li>
+            <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="flex min-h-touch items-center gap-3 px-4 py-3 hover:bg-accent/60 active:bg-accent">
+              <MessageCircle className="h-5 w-5 text-muted-foreground" aria-hidden />
+              <span className="flex-1 text-base font-medium">{t('shell.support')}</span>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" aria-hidden />
+            </a>
+          </li>
+        </ul>
+      </Card>
 
-      <div className="rounded-lg border border-border bg-card p-4 text-card-foreground">
-        {session?.user.email && (
-          <p className="text-sm">{t('auth.signedInAs', { email: session.user.email })}</p>
-        )}
-        {role && <p className="mt-0.5 text-xs text-muted-foreground">{t(`role.${role}` as MessageKey)}</p>}
-        <div className="mt-3 flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/select-tenant')}>
+      <Card className="p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('more.hotel')}</p>
+        <p className="mt-1 text-base font-medium">{property.name}</p>
+        <p className="text-sm text-muted-foreground">{tenant.name}</p>
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('more.account')}</p>
+        {session?.user.email && <p className="mt-1 text-base">{session.user.email}</p>}
+        {role && <p className="text-sm text-muted-foreground">{roleLabel(role)}</p>}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate('/select-tenant')}>
             {t('auth.switchHotel')}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => void onSignOut()}>
+          <Button variant="ghost" onClick={() => void onSignOut()}>
+            <LogOut className="h-4 w-4" aria-hidden />
             {t('auth.signOut')}
           </Button>
         </div>
-      </div>
-    </div>
+      </Card>
+    </Page>
   )
 }

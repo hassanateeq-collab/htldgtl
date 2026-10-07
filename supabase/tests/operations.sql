@@ -78,6 +78,8 @@ declare
   fx    jsonb := pg_temp.fx();
   t_a   uuid := (fx ->> 't_a')::uuid;  t_b uuid := (fx ->> 't_b')::uuid;
   p_a   uuid := (fx ->> 'p_a')::uuid;
+  -- the hotel day, not current_date: Supabase runs in UTC and the suites run at any hour in Karachi
+  d0    date := public.property_today((fx ->> 'p_a')::uuid);
   r_a1  uuid := (fx ->> 'r_a1')::uuid; r_a2 uuid := (fx ->> 'r_a2')::uuid;
   g1    uuid := (fx ->> 'g1')::uuid;
   u_owner uuid := (fx ->> 'u_owner')::uuid; u_mgr uuid := (fx ->> 'u_mgr')::uuid; u_fd uuid := (fx ->> 'u_fd')::uuid;
@@ -107,7 +109,7 @@ begin
   ok := false; err := null; v_res := null; v_rep := null; n := null;
   begin
     v_shift := public.open_cash_shift(p_a, 2000);
-    v_id := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1, null, null, null, 7000, 'cash');
+    v_id := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1, null, null, null, 7000, 'cash');
     insert into public.folio_items (folio_id, kind, description, amount_pkr, method) select id, 'payment', 'JazzCash', 3000, 'jazzcash' from public.folios where booking_id = v_id;
     insert into public.folio_items (folio_id, kind, description, amount_pkr, method) select id, 'refund',  'Refund',   1000, 'cash'     from public.folios where booking_id = v_id;
     select count(*) into n from public.folio_items where cash_shift_id = v_shift;
@@ -139,7 +141,7 @@ begin
   -- 4) shifts are RPC-only for the API role
   ok := false; err := null; code := null;
   begin
-    insert into public.cash_shifts (tenant_id, property_id, shift_date) values (t_a, p_a, current_date);
+    insert into public.cash_shifts (tenant_id, property_id, shift_date) values (t_a, p_a, d0);
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
   test := 'cash: shifts cannot be inserted directly (42501)'; pass := (not ok and code = '42501'); detail := coalesce(err, 'inserted'); return next;
@@ -158,8 +160,8 @@ begin
   -- 6) daily report
   ok := false; err := null; v_rep := null;
   begin
-    v_id  := public.create_booking(p_a, r_a1, current_date, current_date + 2, 1, 'walk_in', 10000, g1, null, null, null, 5000, 'cash', 0, true);
-    v_id2 := public.create_booking(p_a, r_a2, current_date, current_date + 1, 1, 'phone', 10000, g1);
+    v_id  := public.create_booking(p_a, r_a1, d0, d0 + 2, 1, 'walk_in', 10000, g1, null, null, null, 5000, 'cash', 0, true);
+    v_id2 := public.create_booking(p_a, r_a2, d0, d0 + 1, 1, 'phone', 10000, g1);
     v_rep := public.daily_report(p_a);
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; end if; end;

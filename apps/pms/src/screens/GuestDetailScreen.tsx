@@ -1,182 +1,241 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
-import { formatPKR, t, toPakistanE164 } from '@hotel-digital/shared'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Pencil, Phone, Plus } from 'lucide-react'
+import { formatPhone, formatPKR, isCnic, normalizePhone, t } from '@hotel-digital/shared'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { BookingRow } from '@/components/BookingRow'
-import { Panel } from '@/components/Panel'
-import { ErrorNote, Loading } from '@/components/State'
-import { useTenant } from '@/data/tenant'
-import { useBookings, useGuests } from '@/data/queries'
-import { actionErrorLabel, useUpdateGuest } from '@/data/mutations'
-import { owesMoney, type GuestRecordVM } from '@/data/types'
+import { Card, CardContent, CardHeader, DefinitionList, DefinitionRow } from '@/components/ui/card'
+import { Field } from '@/components/ui/field'
+import { Input, Textarea } from '@/components/ui/input'
+import { EmptyState, Skeleton, SkeletonRows, toast } from '@/components/ui/feedback'
+import { Page, PageHeader, SectionTitle } from '@/components/patterns/Page'
+import { BookingRow } from '@/components/patterns/display'
+import { QueryState } from '@/components/patterns/state'
+import { IdFields } from '@/components/booking/fields'
+import { useHotelToday, useTenant } from '@/data/tenant'
+import { useGuestBookings } from '@/data/bookings'
+import { useGuest, useUpdateGuest } from '@/data/guests'
+import type { GuestVM, IdType } from '@/data/types'
+import { errorMessage } from '@/lib/errors'
+import { idTypeLabel } from '@/lib/labels'
 
-const inputClass =
-  'h-11 w-full rounded-md border border-input bg-background px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-const EDITOR_ROLES = ['owner', 'manager', 'front_desk']
-
-export function GuestDetailScreen() {
+export default function GuestDetailScreen() {
   const { id } = useParams()
-  const { property, role, access } = useTenant()
-  const guestsQ = useGuests()
-  const bookingsQ = useBookings(property.id)
-  const update = useUpdateGuest(property.id)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<GuestRecordVM | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [params, setParams] = useSearchParams()
+  const { can } = useTenant()
+  const today = useHotelToday()
+  const guestQ = useGuest(id)
+  const historyQ = useGuestBookings(id)
+  const update = useUpdateGuest()
+  const [editing, setEditing] = useState(params.get('edit') === '1')
+  const g = guestQ.data ?? null
+  const canEdit = can('guests.edit')
+  const canBook = can('bookings.create')
 
-  if (guestsQ.isPending || bookingsQ.isPending) return <Loading />
-  const loadError = guestsQ.error ?? bookingsQ.error
-  if (loadError) return <ErrorNote message={loadError.message} />
+  return (
+    <Page width="lg">
+      <PageHeader
+        title={g?.name ?? t('guests.title')}
+        subtitle={g?.phone ? formatPhone(g.phone) : undefined}
+        back={-1}
+        fallback="/guests"
+        actions={
+          g && canEdit && !editing ? (
+            <Button variant="ghost" size="icon" aria-label={t('guests.edit')} onClick={() => setEditing(true)}>
+              <Pencil className="h-5 w-5" aria-hidden />
+            </Button>
+          ) : undefined
+        }
+      />
+      <QueryState pending={guestQ.isPending} error={guestQ.error} onRetry={() => void guestQ.refetch()} skeleton={<Skeleton className="h-64" />}>
+        {!g ? (
+          <EmptyState title={t('guests.notFound')} />
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {g.inHouse && <Badge tone="inhouse">{t('guests.inHouse')}</Badge>}
+              {g.hasId ? <Badge tone="settled">{t('guests.idOnFile')}</Badge> : <Badge tone="warning">{t('guests.noId')}</Badge>}
+              {g.due > 0 && <Badge tone="due">{t('guests.totalDue')} · {formatPKR(g.due)}</Badge>}
+              <span className="text-sm text-muted-foreground">{g.stays === 0 ? t('guests.noStays') : g.stays === 1 ? t('guests.stay') : t('guests.stays', { n: g.stays })}</span>
+            </div>
 
-  const guest = (guestsQ.data ?? []).find((g) => g.id === id)
-  if (!guest) {
-    return (
-      <div className="mx-auto max-w-md space-y-4 px-4 py-4">
-        <BackLink />
-        <p className="text-sm text-muted-foreground">{t('guests.notFound')}</p>
-      </div>
-    )
-  }
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
+              {editing ? (
+                <GuestForm
+                  guest={g}
+                  busy={update.isPending}
+                  onCancel={() => {
+                    setEditing(false)
+                    if (params.get('edit')) {
+                      const p = new URLSearchParams(params)
+                      p.delete('edit')
+                      setParams(p, { replace: true })
+                    }
+                  }}
+                  onSave={async (input) => {
+                    try {
+                      await update.mutateAsync(input)
+                      toast.success(t('guests.saved'))
+                      setEditing(false)
+                    } catch (e) {
+                      throw new Error(errorMessage(e))
+                    }
+                  }}
+                />
+              ) : (
+                <Card>
+                  <CardHeader
+                    title={t('booking.guest')}
+                    action={
+                      canEdit ? (
+                        <Button variant="link" size="sm" onClick={() => setEditing(true)}>
+                          {t('guests.edit')}
+                        </Button>
+                      ) : undefined
+                    }
+                  />
+                  <CardContent>
+                    <DefinitionList>
+                      <DefinitionRow
+                        label={t('guests.phone')}
+                        value={
+                          g.phone ? (
+                            <a href={`tel:${g.phone}`} className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline">
+                              <Phone className="h-4 w-4" aria-hidden /> {formatPhone(g.phone)}
+                            </a>
+                          ) : (
+                            '—'
+                          )
+                        }
+                      />
+                      <DefinitionRow label={t('guests.email')} value={g.email ?? '—'} />
+                      <DefinitionRow label={t('guests.nationality')} value={g.nationality ?? '—'} />
+                      <DefinitionRow label={t('guests.idType')} value={g.idType ? idTypeLabel(g.idType) : '—'} />
+                      <DefinitionRow label={t('guests.idNumber')} value={g.idNumber ?? '—'} />
+                      {g.idExpiry && <DefinitionRow label={t('guests.idExpiry')} value={g.idExpiry} />}
+                      <DefinitionRow label={t('guests.address')} value={g.address ?? '—'} />
+                    </DefinitionList>
+                    {g.notes && <p className="mt-3 whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{g.notes}</p>}
+                    {canBook && (
+                      <Button className="mt-4 w-full md:w-auto" asChild>
+                        <Link to={`/bookings/new?guest=${g.id}`}>
+                          <Plus className="h-4 w-4" aria-hidden />
+                          {t('guests.newBooking')}
+                        </Link>
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
-  const history = (bookingsQ.data ?? [])
-    .filter((b) => b.guest?.id === guest.id)
-    .sort((a, b) => b.checkIn.localeCompare(a.checkIn))
-  const totalDue = history.filter(owesMoney).reduce((sum, b) => sum + (b.balance ?? 0), 0)
-  const canEdit = access?.accessLevel === 'full' && !!role && EDITOR_ROLES.includes(role)
-  const form = draft ?? guest
+              <section className="space-y-2">
+                <SectionTitle count={historyQ.data?.length}>{t('guests.history')}</SectionTitle>
+                <QueryState pending={historyQ.isPending} error={historyQ.error} skeleton={<SkeletonRows rows={3} />}>
+                  {(historyQ.data ?? []).length === 0 ? (
+                    <EmptyState title={t('guests.noStays')} />
+                  ) : (
+                    historyQ.data!.map((b) => <BookingRow key={b.id} booking={b} today={today} />)
+                  )}
+                </QueryState>
+              </section>
+            </div>
+          </>
+        )}
+      </QueryState>
+    </Page>
+  )
+}
 
-  function startEdit() {
-    setDraft({ ...guest! })
-    setError(null)
-    setEditing(true)
-  }
+interface FormProps {
+  guest: GuestVM
+  busy: boolean
+  onCancel: () => void
+  onSave: (input: Parameters<ReturnType<typeof useUpdateGuest>['mutateAsync']>[0]) => Promise<void>
+}
 
-  async function save(e: FormEvent) {
+function GuestForm({ guest: g, busy, onCancel, onSave }: FormProps) {
+  const [name, setName] = useState(g.name)
+  const [phone, setPhone] = useState(g.phone ?? '')
+  const [email, setEmail] = useState(g.email ?? '')
+  const [nationality, setNationality] = useState(g.nationality ?? '')
+  const [idType, setIdType] = useState<IdType>(g.idType ?? 'cnic')
+  const [idNumber, setIdNumber] = useState(g.idNumber ?? '')
+  const [idExpiry, setIdExpiry] = useState(g.idExpiry ?? '')
+  const [address, setAddress] = useState(g.address ?? '')
+  const [notes, setNotes] = useState(g.notes ?? '')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
     e.preventDefault()
-    if (!draft) return
-    setError(null)
-    const phone = draft.phone?.trim() ?? ''
+    const errs: Record<string, string> = {}
+    const normalized = normalizePhone(phone)
+    if (name.trim().length < 2) errs.name = t('new.nameRequired')
+    if (phone.trim() && (!normalized || !/^\+[1-9]\d{6,14}$/.test(normalized))) errs.phone = t('new.phoneInvalid')
+    if (idNumber.trim() && idType === 'cnic' && !isCnic(idNumber.trim())) errs.id = t('guests.cnicFormat')
+    setErrors(errs)
+    if (Object.keys(errs).length) return
+    setFormError(null)
     try {
-      await update.mutateAsync({
-        id: draft.id,
-        name: draft.name.trim(),
-        phone: phone ? (toPakistanE164(phone) ?? phone) : null,
-        email: draft.email?.trim() || null,
-        nationality: draft.nationality?.trim() || null,
-        cnic: draft.cnic?.trim() || null,
-        passport: draft.passport?.trim() || null,
+      await onSave({
+        id: g.id,
+        name: name.trim(),
+        phone: phone.trim() ? normalized : null,
+        email: email.trim() || null,
+        nationality: nationality.trim() || null,
+        idType: idNumber.trim() ? idType : null,
+        idNumber: idNumber.trim() || null,
+        idExpiry: idExpiry || null,
+        address: address.trim() || null,
+        notes: notes.trim() || null,
       })
-      setEditing(false)
-      setDraft(null)
     } catch (err) {
-      setError(actionErrorLabel(err))
+      setFormError(err instanceof Error ? err.message : t('common.error'))
     }
   }
 
-  const field = (key: keyof GuestRecordVM, label: string, type = 'text') => (
-    <label className="block space-y-1 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <input
-        className={inputClass}
-        type={type}
-        value={(form[key] as string | null) ?? ''}
-        onChange={(e) => setDraft({ ...(draft ?? guest), [key]: e.target.value })}
-      />
-    </label>
-  )
-
   return (
-    <div className="mx-auto w-full max-w-md space-y-4 px-4 py-4 pb-24 md:max-w-5xl md:px-6 md:py-6 md:pb-8">
-      <BackLink />
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold md:text-2xl">{guest.name}</h2>
-          {guest.phone && <p className="text-sm text-muted-foreground">{guest.phone}</p>}
-        </div>
-        {totalDue > 0 && (
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">{t('guests.totalDue')}</p>
-            <p className="text-lg font-semibold text-red-700">{formatPKR(totalDue)}</p>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-4 md:grid md:grid-cols-2 md:items-start md:gap-4 md:space-y-0">
-        <Panel title={t('booking.guest')}>
-          {editing ? (
-            <form onSubmit={save} className="space-y-3">
-              {field('name', t('guests.name'))}
-              {field('phone', t('guests.phone'), 'tel')}
-              {field('email', t('guests.email'), 'email')}
-              {field('nationality', t('guests.nationality'))}
-              {field('cnic', t('guests.cnic'))}
-              {field('passport', t('guests.passport'))}
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={update.isPending || !form.name.trim()}>
-                  {update.isPending ? t('actions.working') : t('guests.save')}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setEditing(false)
-                    setDraft(null)
-                  }}
-                >
-                  {t('guests.cancel')}
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <>
-              <Row label={t('guests.phone')} value={guest.phone ?? '—'} />
-              <Row label={t('guests.email')} value={guest.email ?? '—'} />
-              <Row label={t('guests.nationality')} value={guest.nationality ?? '—'} />
-              <Row label={t('guests.cnic')} value={guest.cnic ?? '—'} />
-              <Row label={t('guests.passport')} value={guest.passport ?? '—'} />
-              {canEdit && (
-                <Button size="sm" variant="outline" className="mt-3" onClick={startEdit}>
-                  {t('guests.edit')}
-                </Button>
-              )}
-            </>
-          )}
-        </Panel>
-
-        <section className="space-y-2">
-          <h3 className="text-sm font-semibold">
-            {t('guests.history')} <span className="font-normal text-muted-foreground">({history.length})</span>
-          </h3>
-          {history.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border p-3 text-center text-sm text-muted-foreground">
-              {t('bookings.empty')}
+    <Card>
+      <CardHeader title={t('guests.edit')} />
+      <CardContent>
+        <form onSubmit={submit} className="space-y-4">
+          <Field label={t('guests.name')} required error={errors.name}>
+            <Input value={name} onChange={(e) => setName(e.target.value)} autoCapitalize="words" />
+          </Field>
+          <Field label={t('guests.phone')} error={errors.phone}>
+            <Input type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </Field>
+          <Field label={t('guests.email')}>
+            <Input type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+          <Field label={t('guests.nationality')}>
+            <Input value={nationality} onChange={(e) => setNationality(e.target.value)} />
+          </Field>
+          <IdFields idType={idType} idNumber={idNumber} onTypeChange={setIdType} onNumberChange={setIdNumber} error={errors.id} />
+          <Field label={t('guests.idExpiry')}>
+            <Input type="date" value={idExpiry} onChange={(e) => setIdExpiry(e.target.value)} />
+          </Field>
+          <Field label={t('guests.address')}>
+            <Textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} />
+          </Field>
+          <Field label={t('guests.notes')}>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          </Field>
+          {formError && (
+            <p role="alert" className="text-sm font-medium text-due">
+              {formError}
             </p>
-          ) : (
-            history.map((b) => <BookingRow key={b.id} booking={b} />)
           )}
-        </section>
-      </div>
-    </div>
-  )
-}
-
-function BackLink() {
-  return (
-    <Link to="/guests" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-      <ChevronLeft className="h-4 w-4" aria-hidden />
-      {t('common.back')}
-    </Link>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-1 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{value}</span>
-    </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" className="flex-1" loading={busy}>
+              {t('common.save')}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }

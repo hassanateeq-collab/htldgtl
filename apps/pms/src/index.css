@@ -2,49 +2,131 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ------------------------------------------------------------------------
+   Design tokens. Semantic first: screens never reach for raw palette classes
+   (no bg-blue-50); they use status / housekeeping / money roles defined here,
+   so the whole app can be re-themed (dark mode, tenant primary colour) in one
+   place. Values are OKLCH; every text/background pair meets WCAG AA.
+   ------------------------------------------------------------------------ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* surfaces */
+  --background: oklch(0.985 0.004 240);
+  --foreground: oklch(0.18 0.02 250);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.18 0.02 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  --popover-foreground: oklch(0.18 0.02 250);
+  --muted: oklch(0.955 0.006 240);
+  --muted-foreground: oklch(0.47 0.02 250);
+  --accent: oklch(0.945 0.012 230);
+  --accent-foreground: oklch(0.2 0.03 240);
+  --border: oklch(0.9 0.008 240);
+  --input: oklch(0.86 0.01 240);
+  --ring: oklch(0.55 0.1 220);
+
+  /* brand */
+  --primary: oklch(0.42 0.085 220);
+  --primary-hover: oklch(0.37 0.085 220);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.94 0.015 225);
+  --secondary-foreground: oklch(0.3 0.06 225);
+  --destructive: oklch(0.53 0.2 25);
+  --destructive-hover: oklch(0.47 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  /* booking status roles */
+  --status-confirmed: oklch(0.55 0.16 255);
+  --status-confirmed-bg: oklch(0.95 0.03 255);
+  --status-confirmed-fg: oklch(0.38 0.14 255);
+  --status-inhouse: oklch(0.55 0.15 150);
+  --status-inhouse-bg: oklch(0.95 0.04 150);
+  --status-inhouse-fg: oklch(0.34 0.11 150);
+  --status-departed: oklch(0.74 0.015 250);
+  --status-departed-bg: oklch(0.95 0.005 250);
+  --status-departed-fg: oklch(0.42 0.02 250);
+  --status-cancelled: oklch(0.72 0.01 250);
+  --status-cancelled-bg: oklch(0.985 0 0);
+  --status-cancelled-fg: oklch(0.5 0.01 250);
+  --status-noshow: oklch(0.76 0.14 75);
+  --status-noshow-bg: oklch(0.965 0.05 80);
+  --status-noshow-fg: oklch(0.44 0.12 70);
+
+  /* money */
+  --due: oklch(0.5 0.19 25);
+  --due-bg: oklch(0.965 0.03 25);
+  --due-border: oklch(0.88 0.06 25);
+  --credit: oklch(0.45 0.15 280);
+  --credit-bg: oklch(0.955 0.03 280);
+  --settled: oklch(0.42 0.12 150);
+
+  /* housekeeping */
+  --hk-clean: oklch(0.55 0.15 150);
+  --hk-clean-bg: oklch(0.95 0.04 150);
+  --hk-inspected: oklch(0.52 0.1 195);
+  --hk-inspected-bg: oklch(0.95 0.03 195);
+  --hk-dirty: oklch(0.66 0.17 50);
+  --hk-dirty-bg: oklch(0.965 0.05 55);
+  --hk-ooo: oklch(0.55 0.02 250);
+  --hk-ooo-bg: oklch(0.93 0.005 250);
+
+  /* attention */
+  --warning: oklch(0.6 0.14 70);
+  --warning-bg: oklch(0.97 0.05 85);
+  --warning-border: oklch(0.88 0.08 80);
+  --success: oklch(0.52 0.14 150);
+
+  /* shape & chrome */
+  --radius: 0.75rem;
+  --topbar-h: 3.5rem;
+  --tabbar-h: 3.75rem;
+  --actionbar-h: 4.5rem;
+  --touch: 2.75rem; /* 44px */
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: oklch(0.16 0.015 250);
+  --foreground: oklch(0.96 0.005 240);
+  --card: oklch(0.21 0.015 250);
+  --card-foreground: oklch(0.96 0.005 240);
+  --popover: oklch(0.21 0.015 250);
+  --popover-foreground: oklch(0.96 0.005 240);
+  --muted: oklch(0.26 0.015 250);
+  --muted-foreground: oklch(0.72 0.015 250);
+  --accent: oklch(0.28 0.02 240);
+  --accent-foreground: oklch(0.96 0.005 240);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 18%);
+  --ring: oklch(0.7 0.08 220);
+  --primary: oklch(0.72 0.09 215);
+  --primary-hover: oklch(0.78 0.09 215);
+  --primary-foreground: oklch(0.16 0.02 250);
+  --secondary: oklch(0.28 0.03 225);
+  --secondary-foreground: oklch(0.92 0.02 225);
+  --destructive: oklch(0.68 0.18 25);
+  --destructive-hover: oklch(0.74 0.18 25);
+  --destructive-foreground: oklch(0.14 0.02 25);
+  --status-confirmed-bg: oklch(0.3 0.06 255);
+  --status-confirmed-fg: oklch(0.85 0.08 255);
+  --status-inhouse-bg: oklch(0.3 0.06 150);
+  --status-inhouse-fg: oklch(0.85 0.1 150);
+  --status-departed-bg: oklch(0.28 0.01 250);
+  --status-departed-fg: oklch(0.78 0.01 250);
+  --status-cancelled-bg: oklch(0.22 0.01 250);
+  --status-cancelled-fg: oklch(0.7 0.01 250);
+  --status-noshow-bg: oklch(0.32 0.07 75);
+  --status-noshow-fg: oklch(0.88 0.1 80);
+  --due: oklch(0.75 0.15 25);
+  --due-bg: oklch(0.3 0.06 25);
+  --due-border: oklch(0.42 0.1 25);
+  --credit: oklch(0.8 0.1 280);
+  --credit-bg: oklch(0.3 0.05 280);
+  --settled: oklch(0.78 0.12 150);
+  --hk-clean-bg: oklch(0.3 0.06 150);
+  --hk-inspected-bg: oklch(0.3 0.05 195);
+  --hk-dirty-bg: oklch(0.34 0.08 55);
+  --hk-ooo-bg: oklch(0.28 0.01 250);
+  --warning-bg: oklch(0.32 0.07 85);
+  --warning-border: oklch(0.45 0.1 80);
 }
 
 @theme inline {
@@ -54,33 +136,116 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-status-confirmed: var(--status-confirmed);
+  --color-status-confirmed-bg: var(--status-confirmed-bg);
+  --color-status-confirmed-fg: var(--status-confirmed-fg);
+  --color-status-inhouse: var(--status-inhouse);
+  --color-status-inhouse-bg: var(--status-inhouse-bg);
+  --color-status-inhouse-fg: var(--status-inhouse-fg);
+  --color-status-departed: var(--status-departed);
+  --color-status-departed-bg: var(--status-departed-bg);
+  --color-status-departed-fg: var(--status-departed-fg);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-cancelled-bg: var(--status-cancelled-bg);
+  --color-status-cancelled-fg: var(--status-cancelled-fg);
+  --color-status-noshow: var(--status-noshow);
+  --color-status-noshow-bg: var(--status-noshow-bg);
+  --color-status-noshow-fg: var(--status-noshow-fg);
+
+  --color-due: var(--due);
+  --color-due-bg: var(--due-bg);
+  --color-due-border: var(--due-border);
+  --color-credit: var(--credit);
+  --color-credit-bg: var(--credit-bg);
+  --color-settled: var(--settled);
+
+  --color-hk-clean: var(--hk-clean);
+  --color-hk-clean-bg: var(--hk-clean-bg);
+  --color-hk-inspected: var(--hk-inspected);
+  --color-hk-inspected-bg: var(--hk-inspected-bg);
+  --color-hk-dirty: var(--hk-dirty);
+  --color-hk-dirty-bg: var(--hk-dirty-bg);
+  --color-hk-ooo: var(--hk-ooo);
+  --color-hk-ooo-bg: var(--hk-ooo-bg);
+
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+  --color-success: var(--success);
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  --spacing-touch: var(--touch);
+  --spacing-topbar: var(--topbar-h);
+  --spacing-tabbar: var(--tabbar-h);
+  --spacing-actionbar: var(--actionbar-h);
+
+  --font-sans: "Inter", "Segoe UI", system-ui, Roboto, "Noto Sans", "Noto Nastaliq Urdu", sans-serif;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     margin: 0;
-    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.45;
     -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
   }
+  input, select, textarea, button {
+    font: inherit;
+  }
+  /* numbers line up in lists, folios and reports */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  /* respect reduced-motion for the drawer and transitions */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* diagonal stripes for out-of-order rooms and hidden no-shows */
+  .striped {
+    background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in oklch, currentColor 18%, transparent) 6px 8px);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media print {
+  .print\:hidden { display: none !important; }
+  body { background: white; color: black; }
+  @page { margin: 12mm; }
 }

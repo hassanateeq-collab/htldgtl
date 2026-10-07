@@ -93,6 +93,8 @@ declare
   fx    jsonb := pg_temp.fx();
   t_a   uuid := (fx ->> 't_a')::uuid;  t_b  uuid := (fx ->> 't_b')::uuid;
   p_a   uuid := (fx ->> 'p_a')::uuid;
+  -- the hotel day, not current_date: Supabase runs in UTC and the suites run at any hour in Karachi
+  d0    date := public.property_today((fx ->> 'p_a')::uuid);
   r_a1  uuid := (fx ->> 'r_a1')::uuid; r_a2 uuid := (fx ->> 'r_a2')::uuid; r_a3 uuid := (fx ->> 'r_a3')::uuid;
   g1    uuid := (fx ->> 'g1')::uuid;
   u_owner uuid := (fx ->> 'u_owner')::uuid; u_mgr uuid := (fx ->> 'u_mgr')::uuid; u_fd uuid := (fx ->> 'u_fd')::uuid;
@@ -108,8 +110,8 @@ begin
   -- 1) create with deposit and ID: prefix numbering, nightly rows, receipt, balance, attribution, normalisation
   ok := false; err := null;
   begin
-    v_id  := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 2, 'phone', 10000, null, 'Probe Guest', '0300 111-2233', null, 5000, 'cash', 1, false, 'cnic', '4210112345671', 'Pakistan');
-    v_id2 := public.create_booking(p_a, r_a2, current_date + 5, current_date + 6, 1, 'walk_in', 10000, g1);
+    v_id  := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 2, 'phone', 10000, null, 'Probe Guest', '0300 111-2233', null, 5000, 'cash', 1, false, 'cnic', '4210112345671', 'Pakistan');
+    v_id2 := public.create_booking(p_a, r_a2, d0 + 5, d0 + 6, 1, 'walk_in', 10000, g1);
     select booking_no, created_by into v_no, v_by from public.bookings where id = v_id;
     select booking_no into v_no2 from public.bookings where id = v_id2;
     v_nights := pg_temp.live_nights(v_id);
@@ -126,8 +128,8 @@ begin
   -- 2) no double booking
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1);
-    perform public.create_booking(p_a, r_a1, current_date + 6, current_date + 8, 1, 'phone', 10000, g1);
+    v_id := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1);
+    perform public.create_booking(p_a, r_a1, d0 + 6, d0 + 8, 1, 'phone', 10000, g1);
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
   test := 'overlapping stay in one room rejected (23P01)'; pass := (not ok and code = '23P01'); detail := coalesce(err, 'created'); return next;
@@ -135,13 +137,13 @@ begin
   -- 3) deposit needs a method; out-of-order room refused
   ok := false; err := null; code := null;
   begin
-    perform public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1, null, null, null, 5000, null);
+    perform public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1, null, null, null, 5000, null);
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
   test := 'deposit without a method rejected (HD009)'; pass := (not ok and code = 'HD009'); detail := coalesce(err, 'created'); return next;
   ok := false; err := null; code := null;
   begin
-    perform public.create_booking(p_a, r_a3, current_date + 5, current_date + 7, 1, 'phone', 10000, g1);
+    perform public.create_booking(p_a, r_a3, d0 + 5, d0 + 7, 1, 'phone', 10000, g1);
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
   test := 'out-of-order room refused (HD008)'; pass := (not ok and code = 'HD008'); detail := coalesce(err, 'created'); return next;
@@ -149,21 +151,21 @@ begin
   -- 4) check-in rules: ID required, dates window, stamps and room sync
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date, current_date + 2, 1, 'walk_in', 10000, null, 'No Id Guest', null);
+    v_id := public.create_booking(p_a, r_a1, d0, d0 + 2, 1, 'walk_in', 10000, null, 'No Id Guest', null);
     perform public.set_booking_status(v_id, 'checked_in');
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
   test := 'check-in without a guest ID rejected (HD006)'; pass := (not ok and code = 'HD006'); detail := coalesce(err, 'checked in'); return next;
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date + 3, current_date + 5, 1, 'phone', 10000, g1);
+    v_id := public.create_booking(p_a, r_a1, d0 + 3, d0 + 5, 1, 'phone', 10000, g1);
     perform public.set_booking_status(v_id, 'checked_in');
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
   test := 'check-in before the arrival date rejected (HD005)'; pass := (not ok and code = 'HD005'); detail := coalesce(err, 'checked in'); return next;
   ok := false; err := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date, current_date + 2, 1, 'walk_in', 10000, g1);
+    v_id := public.create_booking(p_a, r_a1, d0, d0 + 2, 1, 'walk_in', 10000, g1);
     perform public.set_booking_status(v_id, 'checked_in');
     select status::text, checked_in_at into v_status, v_ts from public.bookings where id = v_id;
     select status::text into v_fstatus from public.booking_rooms where booking_id = v_id;
@@ -172,10 +174,11 @@ begin
   test := 'check-in stamps checked_in_at and syncs the room row'; pass := (ok and v_status = 'checked_in' and v_ts is not null and v_fstatus = 'checked_in');
   detail := coalesce(err, format('status=%s stamped=%s room=%s', v_status, v_ts is not null, v_fstatus)); return next;
 
-  -- 5) walk-in (create & check in) then early departure: nights released, folio closed, room dirty, dates truncated
+  -- 5) walk-in (create & check in, 10,000 deposit) then same-day departure: the first night is kept
+  --    (minimum one night, migration 19), the 2 unstayed nights are released, folio closed, room dirty, dates truncated
   ok := false; err := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date, current_date + 3, 1, 'walk_in', 10000, null, 'Walkin Guest', '03009998877', null, 0, null, 0, true, 'cnic', '42101-7654321-9', null);
+    v_id := public.create_booking(p_a, r_a1, d0, d0 + 3, 1, 'walk_in', 10000, null, 'Walkin Guest', '03009998877', null, 10000, 'cash', 0, true, 'cnic', '42101-7654321-9', null);
     select status::text into v_status from public.bookings where id = v_id;
     if v_status <> 'checked_in' then raise exception 'walk-in not checked in: %', v_status; end if;
     perform public.set_booking_status(v_id, 'checked_out');
@@ -185,14 +188,14 @@ begin
     v_voided := pg_temp.voided_items(v_id);
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; end if; end;
-  test := 'walk-in check-in; early departure releases 3 nights, closes the folio, dirties the room, truncates the stay';
-  pass := (ok and v_status = 'checked_out' and v_out = current_date and v_fstatus = 'closed' and v_bal = 0 and v_hk = 'dirty' and v_voided = 3);
+  test := 'walk-in check-in; same-day departure keeps the first night, releases 2, closes the folio, dirties the room, truncates the stay';
+  pass := (ok and v_status = 'checked_out' and v_out = d0 + 1 and v_fstatus = 'closed' and v_bal = 0 and v_hk = 'dirty' and v_voided = 2);
   detail := coalesce(err, format('status=%s out=%s folio=%s bal=%s hk=%s voided=%s', v_status, v_out, v_fstatus, v_bal, v_hk, v_voided)); return next;
 
   -- 6) balance due blocks check-out; manager override leaves a receivable; owner closes after payment
   ok := false; err := null; code := null; v_bal := null; v_by := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date, current_date + 1, 1, 'walk_in', 10000, g1, null, null, null, 0, null, 0, true);
+    v_id := public.create_booking(p_a, r_a1, d0, d0 + 1, 1, 'walk_in', 10000, g1, null, null, null, 0, null, 0, true);
     insert into public.folio_items (folio_id, kind, category, description, amount_pkr) select id, 'charge', 'food', 'Dinner', 2500 from public.folios where booking_id = v_id;
     begin
       perform public.set_booking_status(v_id, 'checked_out');
@@ -224,7 +227,7 @@ begin
   -- 7) credit balance blocks check-out
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date, current_date + 2, 1, 'walk_in', 10000, g1, null, null, null, 30000, 'cash', 0, true);
+    v_id := public.create_booking(p_a, r_a1, d0, d0 + 2, 1, 'walk_in', 10000, g1, null, null, null, 30000, 'cash', 0, true);
     perform public.set_booking_status(v_id, 'checked_out');
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
@@ -233,12 +236,12 @@ begin
   -- 8) cancellation and no-show void the room nights; deposits stay as credit
   ok := false; err := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1, null, null, null, 5000, 'jazzcash');
+    v_id := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1, null, null, null, 5000, 'jazzcash');
     perform public.set_booking_status(v_id, 'cancelled', 'Guest changed plans');
     select f.status::text, f.balance into v_fstatus, v_bal from public.folios f where f.booking_id = v_id;
     v_voided := pg_temp.voided_items(v_id);
     select cancellation_reason into v_no from public.bookings where id = v_id;
-    v_id2 := public.create_booking(p_a, r_a2, current_date + 5, current_date + 7, 1, 'phone', 10000, g1);
+    v_id2 := public.create_booking(p_a, r_a2, d0 + 5, d0 + 7, 1, 'phone', 10000, g1);
     perform public.set_booking_status(v_id2, 'no_show');
     select f.status::text into v_status from public.folios f where f.booking_id = v_id2;
     ok := true; raise exception 'ROLLBACK_PROBE';
@@ -250,7 +253,7 @@ begin
   -- 9) reinstating a no-show: owner yes (nights re-posted), front desk no
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1);
+    v_id := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1);
     perform public.set_booking_status(v_id, 'no_show');
     begin
       perform public.set_booking_status(v_id, 'confirmed');
@@ -271,35 +274,35 @@ begin
   -- 10) update_booking: extend + new rate re-posts nights; move into an occupied room fails; in-house check-in locked
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1);
-    perform public.update_booking(v_id, r_a1, current_date + 5, current_date + 8, 2, 'walk_in', 16000, 'extended', 1);
+    v_id := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1);
+    perform public.update_booking(v_id, r_a1, d0 + 5, d0 + 8, 2, 'walk_in', 16000, 'extended', 1);
     v_nights := pg_temp.live_nights(v_id);
     select balance into v_bal from public.folios where booking_id = v_id;
     select check_out, adults, children into v_out, n, v_voided from public.bookings where id = v_id;
-    v_id2 := public.create_booking(p_a, r_a2, current_date + 6, current_date + 7, 1, 'phone', 10000, g1);
+    v_id2 := public.create_booking(p_a, r_a2, d0 + 6, d0 + 7, 1, 'phone', 10000, g1);
     begin
-      perform public.update_booking(v_id, r_a2, current_date + 5, current_date + 8, 2, 'walk_in', 16000, null);
+      perform public.update_booking(v_id, r_a2, d0 + 5, d0 + 8, 2, 'walk_in', 16000, null);
       err := 'moved into an occupied room';
     exception when others then if sqlstate <> '23P01' then err := sqlerrm; end if; end;
     ok := (err is null); raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := coalesce(err, sqlerrm); end if; end;
   test := 'edit: 3 nights at 16000 re-posted (48000), adults/children saved; move into an occupied room rejected';
-  pass := (ok and v_nights = 3 and v_bal = 48000 and v_out = current_date + 8 and n = 2 and v_voided = 1);
+  pass := (ok and v_nights = 3 and v_bal = 48000 and v_out = d0 + 8 and n = 2 and v_voided = 1);
   detail := coalesce(err, format('nights=%s bal=%s out=%s adults=%s children=%s', v_nights, v_bal, v_out, n, v_voided)); return next;
 
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date, current_date + 3, 1, 'walk_in', 10000, g1, null, null, null, 0, null, 0, true);
-    perform public.update_booking(v_id, r_a1, current_date + 1, current_date + 3, 1, 'walk_in', 10000, null);
+    v_id := public.create_booking(p_a, r_a1, d0, d0 + 3, 1, 'walk_in', 10000, g1, null, null, null, 0, null, 0, true);
+    perform public.update_booking(v_id, r_a1, d0 + 1, d0 + 3, 1, 'walk_in', 10000, null);
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
   test := 'edit: check-in locked while in-house (HD005)'; pass := (not ok and code = 'HD005'); detail := coalesce(err, 'changed'); return next;
 
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1);
+    v_id := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1);
     perform public.set_booking_status(v_id, 'cancelled', 'x');
-    perform public.update_booking(v_id, r_a1, current_date + 5, current_date + 8, 1, 'phone', 10000, null);
+    perform public.update_booking(v_id, r_a1, d0 + 5, d0 + 8, 1, 'phone', 10000, null);
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
   test := 'edit: a cancelled booking is no longer editable (HD003)'; pass := (not ok and code = 'HD003'); detail := coalesce(err, 'changed'); return next;
@@ -307,7 +310,7 @@ begin
   -- 11) direct table writes obey the same rules
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date, current_date + 2, 1, 'walk_in', 10000, g1, null, null, null, 0, null, 0, true);
+    v_id := public.create_booking(p_a, r_a1, d0, d0 + 2, 1, 'walk_in', 10000, g1, null, null, null, 0, null, 0, true);
     insert into public.folio_items (folio_id, kind, category, description, amount_pkr) select id, 'charge', 'laundry', 'Laundry', 800 from public.folios where booking_id = v_id;
     update public.bookings set status = 'checked_out' where id = v_id;
     ok := true; raise exception 'ROLLBACK_PROBE';
@@ -315,7 +318,7 @@ begin
   test := 'direct status flip to checked_out with money owed rejected (HD001)'; pass := (not ok and code = 'HD001'); detail := coalesce(err, 'flipped'); return next;
   ok := false; err := null; code := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1);
+    v_id := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1);
     update public.bookings set booking_no = 'HACK-1' where id = v_id;
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; code := sqlstate; end if; end;
@@ -324,7 +327,7 @@ begin
   -- 12) the folio is append-only for the API role
   v_id := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date + 5, current_date + 7, 1, 'phone', 10000, g1, null, null, null, 4000, 'cash');
+    v_id := public.create_booking(p_a, r_a1, d0 + 5, d0 + 7, 1, 'phone', 10000, g1, null, null, null, 4000, 'cash');
     select fi.id into v_item from public.folio_items fi join public.folios f on f.id = fi.folio_id where f.booking_id = v_id and fi.kind = 'payment';
   exception when others then err := sqlerrm; end;
   ok := false; err := null; code := null;
@@ -370,8 +373,8 @@ begin
   -- 14) reopen and close a folio (owner); items cannot be posted while closed
   ok := false; err := null; v_fstatus := null; v_status := null;
   begin
-    v_id := public.create_booking(p_a, r_a2, current_date, current_date + 1, 1, 'walk_in', 10000, g1, null, null, null, 0, null, 0, true);
-    perform public.set_booking_status(v_id, 'checked_out');   -- same-day departure: night released, balance 0, folio closed
+    v_id := public.create_booking(p_a, r_a2, d0, d0 + 1, 1, 'walk_in', 10000, g1, null, null, null, 10000, 'cash', 0, true);
+    perform public.set_booking_status(v_id, 'checked_out');   -- same-day departure keeps the (paid) first night: balance 0, folio closed
     select id, status::text into v_folio, v_fstatus from public.folios where booking_id = v_id;
     begin
       insert into public.folio_items (folio_id, kind, category, description, amount_pkr) values (v_folio, 'charge', 'other', 'Late item', 100);
@@ -391,7 +394,7 @@ begin
   -- 15) late departure: extra nights are charged, dates extended
   ok := false; err := null; v_nights := null; v_out := null;
   begin
-    v_id := public.create_booking(p_a, r_a1, current_date - 2, current_date - 1, 1, 'phone', 10000, g1);
+    v_id := public.create_booking(p_a, r_a1, d0 - 2, d0 - 1, 1, 'phone', 10000, g1);
     execute 'reset role';
     alter table public.bookings disable trigger lifecycle_guard;
     update public.bookings set status = 'checked_in', checked_in_at = now() - interval '2 days' where id = v_id;
@@ -405,7 +408,7 @@ begin
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; end if; end;
   perform pg_temp.as_user(u_fd, t_a);
-  test := 'late departure: the extra night is charged and the stay extended to today'; pass := (ok and v_nights = 2 and v_out = current_date and v_bal = 0); detail := coalesce(err, format('nights=%s out=%s bal=%s', v_nights, v_out, v_bal)); return next;
+  test := 'late departure: the extra night is charged and the stay extended to today'; pass := (ok and v_nights = 2 and v_out = d0 and v_bal = 0); detail := coalesce(err, format('nights=%s out=%s bal=%s', v_nights, v_out, v_bal)); return next;
 
   -- 16) tax: exclusive on rooms only; inclusive on everything
   ok := false; err := null; v_bal := null;
@@ -413,7 +416,7 @@ begin
     execute 'reset role';
     update public.properties set tax_name = 'Sindh Sales Tax', tax_rate_pct = 13, tax_mode = 'exclusive', tax_applies_to = 'room' where id = p_a;
     perform pg_temp.as_user(u_fd, t_a);
-    v_id := public.create_booking(p_a, r_a1, current_date + 10, current_date + 11, 1, 'phone', 10000, g1);
+    v_id := public.create_booking(p_a, r_a1, d0 + 10, d0 + 11, 1, 'phone', 10000, g1);
     insert into public.folio_items (folio_id, kind, category, description, amount_pkr) select id, 'charge', 'food', 'Lunch', 1000 from public.folios where booking_id = v_id;
     select balance, total_tax into v_bal, v_tax from public.folios where booking_id = v_id;
     ok := true; raise exception 'ROLLBACK_PROBE';
@@ -425,7 +428,7 @@ begin
     execute 'reset role';
     update public.properties set tax_name = 'Sindh Sales Tax', tax_rate_pct = 13, tax_mode = 'inclusive', tax_applies_to = 'all' where id = p_a;
     perform pg_temp.as_user(u_fd, t_a);
-    v_id := public.create_booking(p_a, r_a1, current_date + 10, current_date + 11, 1, 'phone', 11300, g1);
+    v_id := public.create_booking(p_a, r_a1, d0 + 10, d0 + 11, 1, 'phone', 11300, g1);
     select balance, total_charges, total_tax into v_bal, v_charges, v_tax from public.folios where booking_id = v_id;
     ok := true; raise exception 'ROLLBACK_PROBE';
   exception when others then if sqlerrm <> 'ROLLBACK_PROBE' then err := sqlerrm; end if; end;

@@ -2,41 +2,44 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { t } from '@hotel-digital/shared'
 import { Button } from '@/components/ui/button'
+import { Field } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { getLastSlug } from '@/auth/storage'
-
-const inputClass =
-  'h-11 w-full rounded-md border border-input bg-background px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 /** /login — asks for the hotel code, then goes to that hotel's login page. */
-export function LoginEntryScreen() {
+export default function LoginEntryScreen() {
   const navigate = useNavigate()
   const [slug, setSlug] = useState(getLastSlug() ?? '')
+  useDocumentTitle(t('auth.hotelCode'))
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
-    const clean = slug.trim().toLowerCase()
+    const clean = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
     if (clean) navigate(`/t/${clean}/login`)
   }
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col justify-center px-4">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">Hotel Digital</p>
-      <h1 className="mt-1 text-2xl font-semibold">{t('auth.hotelCode')}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">{t('auth.hotelCodeHint')}</p>
-      <form onSubmit={onSubmit} className="mt-6 space-y-3">
-        <input
-          className={inputClass}
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          placeholder="paramount"
-          autoCapitalize="none"
-          autoCorrect="off"
-          autoFocus
-        />
-        <Button type="submit" className="w-full" size="lg">
+    <main className="mx-auto flex min-h-svh max-w-sm flex-col justify-center px-6">
+      <p className="text-xs font-semibold uppercase tracking-widest text-primary">{t('auth.brand')}</p>
+      <h1 className="mt-2 text-2xl font-semibold">{t('auth.hotelCode')}</h1>
+      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <Field label={t('auth.hotelCode')} hint={t('auth.hotelCodeHint')} hideLabel>
+          <Input
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="paramount"
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="organization"
+            autoFocus
+            className="text-lg"
+          />
+        </Field>
+        <Button type="submit" className="w-full" size="lg" disabled={!slug.trim()}>
           {t('auth.continue')}
         </Button>
       </form>
-    </div>
+    </main>
   )
 }
